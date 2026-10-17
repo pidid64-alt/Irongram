@@ -4244,7 +4244,8 @@ public class AndroidUtilities {
             f = FileLoader.getInstance(UserConfig.selectedAccount).getPathToMessage(message.messageOwner);
         }
         if (f != null && f.exists()) {
-            if (IrongramPluginInstallActivity.isPluginFile(fileName)
+            if ((IrongramPluginInstallActivity.isPluginFile(fileName)
+                    || IrongramPluginInstallActivity.isPluginFile(f))
                     && IrongramPluginInstallActivity.open(f, fileName, activity, parentFragment)) {
                 return;
             }
@@ -4323,7 +4324,8 @@ public class AndroidUtilities {
 
     public static boolean openForView(File f, String fileName, String mimeType, final Activity activity, Theme.ResourcesProvider resourcesProvider, boolean restrict) {
         if (f != null && f.exists()) {
-            if (IrongramPluginInstallActivity.isPluginFile(fileName)
+            if ((IrongramPluginInstallActivity.isPluginFile(fileName)
+                    || IrongramPluginInstallActivity.isPluginFile(f))
                     && IrongramPluginInstallActivity.open(f, fileName, activity, null)) {
                 return true;
             }
