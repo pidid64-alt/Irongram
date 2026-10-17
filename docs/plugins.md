@@ -1,8 +1,10 @@
 # Irongram Python plugins (compatibility layer in progress)
 
-Irongram can import a single `.py` file from Settings → Plugins. Imported files start
-**disabled**. Enabling a plugin executes its Python code inside the Irongram process; install
-only code and dependencies you trust. Plugins are not sandboxed.
+Irongram can import a single Python plugin from Settings → Plugins, either as `.py` or as the
+exteraGram-style `.plugin` file. Tapping a `.plugin` attachment in a chat opens a metadata preview
+and an install action. These are plain Python source files with a different extension, not `.elyx`
+archives. Imported files start **disabled**. Enabling a plugin executes its Python code inside the
+Irongram process; install only code and dependencies you trust. Plugins are not sandboxed.
 
 The runtime is Python 3.11 via Chaquopy. The app minimum Android version is API 24 because
 that is the minimum supported by this Python runtime.

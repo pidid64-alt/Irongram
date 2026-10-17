@@ -112,7 +112,8 @@ public final class IrongramPluginsActivity extends BaseNekoSettingsActivity {
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
                 "text/x-python",
                 "application/x-python-code",
-                "text/plain"
+                "text/plain",
+                "application/octet-stream"
         });
         startActivityForResult(intent, PICK_PLUGIN_FILE);
     }

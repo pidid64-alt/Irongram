@@ -176,6 +176,25 @@ public final class IrongramPluginsController {
         return result;
     }
 
+    public void inspectPlugin(File sourceFile, ImportCallback callback) {
+        executor.execute(() -> {
+            PluginMetadata metadata = null;
+            String errorMessage = null;
+            try {
+                if (sourceFile == null || !sourceFile.isFile()) {
+                    throw new IllegalArgumentException("Could not open the plugin file");
+                }
+                metadata = PluginMetadata.fromSource(readFile(sourceFile));
+            } catch (Throwable error) {
+                errorMessage = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+                FileLog.e(error);
+            }
+            PluginMetadata result = metadata;
+            String resultError = errorMessage;
+            mainHandler.post(() -> callback.onComplete(result, resultError));
+        });
+    }
+
     public void importPlugin(Uri uri, ImportCallback callback) {
         executor.execute(() -> {
             PluginMetadata metadata = null;
@@ -188,25 +207,7 @@ public final class IrongramPluginsController {
                     }
                     bytes = readLimited(input, MAX_PLUGIN_SIZE);
                 }
-                String source = new String(bytes, StandardCharsets.UTF_8);
-                metadata = PluginMetadata.fromSource(source);
-                File directory = getPluginsDirectory();
-                if (!directory.exists() && !directory.mkdirs()) {
-                    throw new IllegalStateException("Could not create the plugins directory");
-                }
-                File target = new File(directory, metadata.id + ".py");
-                if (target.exists()) {
-                    throw new IllegalArgumentException("A plugin with this ID is already installed");
-                }
-                File temporary = new File(directory, metadata.id + ".py.tmp");
-                try (FileOutputStream output = new FileOutputStream(temporary)) {
-                    output.write(bytes);
-                    output.getFD().sync();
-                }
-                if (!temporary.renameTo(target)) {
-                    temporary.delete();
-                    throw new IllegalStateException("Could not install the plugin file");
-                }
+                metadata = installPluginBytes(bytes);
             } catch (Throwable error) {
                 errorMessage = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
                 FileLog.e(error);
@@ -215,6 +216,51 @@ public final class IrongramPluginsController {
             String resultError = errorMessage;
             mainHandler.post(() -> callback.onComplete(result, resultError));
         });
+    }
+
+    public void importPlugin(File sourceFile, ImportCallback callback) {
+        executor.execute(() -> {
+            PluginMetadata metadata = null;
+            String errorMessage = null;
+            try {
+                if (sourceFile == null || !sourceFile.isFile()) {
+                    throw new IllegalArgumentException("Could not open the plugin file");
+                }
+                byte[] bytes;
+                try (InputStream input = new FileInputStream(sourceFile)) {
+                    bytes = readLimited(input, MAX_PLUGIN_SIZE);
+                }
+                metadata = installPluginBytes(bytes);
+            } catch (Throwable error) {
+                errorMessage = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+                FileLog.e(error);
+            }
+            PluginMetadata result = metadata;
+            String resultError = errorMessage;
+            mainHandler.post(() -> callback.onComplete(result, resultError));
+        });
+    }
+
+    private PluginMetadata installPluginBytes(byte[] bytes) throws Exception {
+        PluginMetadata metadata = PluginMetadata.fromSource(new String(bytes, StandardCharsets.UTF_8));
+        File directory = getPluginsDirectory();
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IllegalStateException("Could not create the plugins directory");
+        }
+        File target = new File(directory, metadata.id + ".py");
+        if (target.exists()) {
+            throw new IllegalArgumentException("A plugin with this ID is already installed");
+        }
+        File temporary = new File(directory, metadata.id + ".py.tmp");
+        try (FileOutputStream output = new FileOutputStream(temporary)) {
+            output.write(bytes);
+            output.getFD().sync();
+        }
+        if (!temporary.renameTo(target)) {
+            temporary.delete();
+            throw new IllegalStateException("Could not install the plugin file");
+        }
+        return metadata;
     }
 
     public void setPluginEnabled(PluginMetadata metadata, boolean enabled, OperationCallback callback) {
