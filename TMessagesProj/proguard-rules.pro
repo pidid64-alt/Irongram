@@ -14,6 +14,7 @@
 -keep class org.telegram.messenger.DispatchQueue { *; }
 -keep class org.telegram.messenger.UserConfig { *; }
 -keep class org.telegram.messenger.SendMessagesHelper { *; }
+-keep class org.telegram.messenger.SendMessagesHelper$SendMessageParams { *; }
 -keep class org.telegram.messenger.Utilities { *; }
 -keep class org.telegram.messenger.R$raw { *; }
 -keep class org.telegram.ui.LaunchActivity { *; }
