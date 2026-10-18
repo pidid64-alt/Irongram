@@ -32,6 +32,7 @@ public final class IrongramPluginsController {
     private static final String PREFS_NAME = "irongram_plugins";
     private static final String ENABLED_PREFIX = "enabled_";
     private static final String ERROR_PREFIX = "error_";
+    private static final String PLUGIN_SYSTEM_ENABLED = "plugin_system_enabled";
     private static final int MAX_PLUGIN_SIZE = 5 * 1024 * 1024;
 
     private static volatile IrongramPluginsController instance;
@@ -49,6 +50,7 @@ public final class IrongramPluginsController {
     private volatile PyObject runtime;
     private volatile int loadedPluginCount;
     private volatile boolean startupLoadScheduled;
+    private volatile boolean pluginSystemEnabled;
 
     public interface OperationCallback {
         void onComplete(boolean success, String error);
@@ -131,6 +133,7 @@ public final class IrongramPluginsController {
     private IrongramPluginsController(Context context) {
         this.context = context.getApplicationContext();
         preferences = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        pluginSystemEnabled = preferences.getBoolean(PLUGIN_SYSTEM_ENABLED, true);
     }
 
     public static IrongramPluginsController getInstance() {
@@ -148,6 +151,14 @@ public final class IrongramPluginsController {
             }
         }
         return local;
+    }
+
+    public boolean isPluginSystemEnabled() {
+        return pluginSystemEnabled;
+    }
+
+    public File getPluginFile(PluginMetadata metadata) {
+        return metadata == null ? null : pluginFile(metadata.id);
     }
 
     public List<InstalledPlugin> getInstalledPlugins() {
@@ -263,35 +274,122 @@ public final class IrongramPluginsController {
         return metadata;
     }
 
+    public void setPluginSystemEnabled(boolean enabled, OperationCallback callback) {
+        pluginSystemEnabled = enabled;
+        preferences.edit().putBoolean(PLUGIN_SYSTEM_ENABLED, enabled).apply();
+        executor.execute(() -> {
+            boolean success = true;
+            String errorMessage = null;
+            if (!enabled) {
+                if (!pluginSystemEnabled) {
+                    try {
+                        synchronized (pythonLock) {
+                            unloadAllPluginsLocked();
+                        }
+                    } catch (Throwable error) {
+                        success = false;
+                        errorMessage = errorSummary(error);
+                        FileLog.e(error);
+                    }
+                }
+            } else {
+                for (InstalledPlugin entry : getInstalledPlugins()) {
+                    if (!pluginSystemEnabled) {
+                        break;
+                    }
+                    if (!entry.enabled) {
+                        continue;
+                    }
+                    try {
+                        synchronized (pythonLock) {
+                            if (!pluginSystemEnabled) {
+                                continue;
+                            }
+                            loadPluginLocked(entry.metadata);
+                        }
+                        if (pluginSystemEnabled) {
+                            preferences.edit().remove(ERROR_PREFIX + entry.metadata.id).apply();
+                        }
+                    } catch (Throwable error) {
+                        String pluginError = errorSummary(error);
+                        preferences.edit()
+                                .putBoolean(ENABLED_PREFIX + entry.metadata.id, false)
+                                .putString(ERROR_PREFIX + entry.metadata.id, pluginError)
+                                .apply();
+                        if (errorMessage == null) {
+                            errorMessage = pluginError;
+                        }
+                        success = false;
+                        FileLog.e(error);
+                    }
+                }
+            }
+            boolean result = success;
+            String resultError = errorMessage;
+            if (callback != null) {
+                mainHandler.post(() -> callback.onComplete(result, resultError));
+            }
+        });
+    }
+
+    private void loadPluginLocked(PluginMetadata metadata) {
+        if (!pluginSystemEnabled) {
+            return;
+        }
+        PyObject pythonRuntime = ensureRuntimeLocked();
+        boolean wasLoaded = pythonRuntime.callAttr("is_plugin_loaded", metadata.id).toBoolean();
+        if (!wasLoaded) {
+            pythonRuntime.callAttr(
+                    "install_requirements",
+                    pluginFile(metadata.id).getAbsolutePath(),
+                    getPythonLibrariesDirectory().getAbsolutePath()
+            );
+            if (!pluginSystemEnabled) {
+                return;
+            }
+            pythonRuntime.callAttr(
+                    "load_plugin",
+                    metadata.id,
+                    pluginFile(metadata.id).getAbsolutePath(),
+                    pluginSettingsFile(metadata.id).getAbsolutePath()
+            );
+            loadedPluginCount++;
+        }
+        collectRuntimeErrorsLocked();
+        if (!pluginSystemEnabled) {
+            unloadPluginLocked(metadata.id);
+        }
+    }
+
+    private void unloadAllPluginsLocked() {
+        if (runtime == null) {
+            loadedPluginCount = 0;
+            return;
+        }
+        for (PyObject pluginId : runtime.callAttr("loaded_plugin_ids").asList()) {
+            runtime.callAttr("unload_plugin", pluginId.toString());
+        }
+        loadedPluginCount = 0;
+        collectRuntimeErrorsLocked();
+    }
+
     public void setPluginEnabled(PluginMetadata metadata, boolean enabled, OperationCallback callback) {
         executor.execute(() -> {
             boolean success = false;
             String errorMessage = null;
             if (enabled) {
                 try {
-                    synchronized (pythonLock) {
-                        PyObject pythonRuntime = ensureRuntimeLocked();
-                        boolean wasLoaded = pythonRuntime.callAttr("is_plugin_loaded", metadata.id).toBoolean();
-                        if (!wasLoaded) {
-                            pythonRuntime.callAttr(
-                                    "install_requirements",
-                                    pluginFile(metadata.id).getAbsolutePath(),
-                                    getPythonLibrariesDirectory().getAbsolutePath()
-                            );
-                            pythonRuntime.callAttr(
-                                    "load_plugin",
-                                    metadata.id,
-                                    pluginFile(metadata.id).getAbsolutePath(),
-                                    pluginSettingsFile(metadata.id).getAbsolutePath()
-                            );
-                            loadedPluginCount++;
+                    if (pluginSystemEnabled) {
+                        synchronized (pythonLock) {
+                            loadPluginLocked(metadata);
                         }
-                        collectRuntimeErrorsLocked();
                     }
-                    preferences.edit()
-                            .putBoolean(ENABLED_PREFIX + metadata.id, true)
-                            .remove(ERROR_PREFIX + metadata.id)
-                            .apply();
+                    SharedPreferences.Editor editor = preferences.edit()
+                            .putBoolean(ENABLED_PREFIX + metadata.id, true);
+                    if (pluginSystemEnabled) {
+                        editor.remove(ERROR_PREFIX + metadata.id);
+                    }
+                    editor.apply();
                     success = true;
                 } catch (Throwable error) {
                     preferences.edit()
@@ -315,7 +413,9 @@ public final class IrongramPluginsController {
             }
             boolean result = success;
             String resultError = errorMessage;
-            mainHandler.post(() -> callback.onComplete(result, resultError));
+            if (callback != null) {
+                mainHandler.post(() -> callback.onComplete(result, resultError));
+            }
         });
     }
 
@@ -493,30 +593,22 @@ public final class IrongramPluginsController {
         startupLoadScheduled = true;
         executor.execute(() -> {
             for (InstalledPlugin entry : getInstalledPlugins()) {
+                if (!pluginSystemEnabled) {
+                    break;
+                }
                 if (!entry.enabled) {
                     continue;
                 }
                 try {
                     synchronized (pythonLock) {
-                        PyObject pythonRuntime = ensureRuntimeLocked();
-                        boolean wasLoaded = pythonRuntime.callAttr("is_plugin_loaded", entry.metadata.id).toBoolean();
-                        if (!wasLoaded) {
-                            pythonRuntime.callAttr(
-                                    "install_requirements",
-                                    pluginFile(entry.metadata.id).getAbsolutePath(),
-                                    getPythonLibrariesDirectory().getAbsolutePath()
-                            );
-                            pythonRuntime.callAttr(
-                                    "load_plugin",
-                                    entry.metadata.id,
-                                    pluginFile(entry.metadata.id).getAbsolutePath(),
-                                    pluginSettingsFile(entry.metadata.id).getAbsolutePath()
-                            );
-                            loadedPluginCount++;
+                        if (!pluginSystemEnabled) {
+                            break;
                         }
-                        collectRuntimeErrorsLocked();
+                        loadPluginLocked(entry.metadata);
                     }
-                    preferences.edit().remove(ERROR_PREFIX + entry.metadata.id).apply();
+                    if (pluginSystemEnabled) {
+                        preferences.edit().remove(ERROR_PREFIX + entry.metadata.id).apply();
+                    }
                 } catch (Throwable error) {
                     preferences.edit()
                             .putBoolean(ENABLED_PREFIX + entry.metadata.id, false)
@@ -549,10 +641,13 @@ public final class IrongramPluginsController {
     }
 
     private boolean callBooleanHook(String method, Object... args) {
-        if (loadedPluginCount == 0 || runtime == null) {
+        if (!pluginSystemEnabled || loadedPluginCount == 0 || runtime == null) {
             return true;
         }
         synchronized (pythonLock) {
+            if (!pluginSystemEnabled || loadedPluginCount == 0 || runtime == null) {
+                return true;
+            }
             try {
                 boolean result = ensureRuntimeLocked().callAttr(method, args).toBoolean();
                 collectRuntimeErrorsLocked();
@@ -565,10 +660,13 @@ public final class IrongramPluginsController {
     }
 
     private void callVoidHook(String method, Object... args) {
-        if (loadedPluginCount == 0 || runtime == null) {
+        if (!pluginSystemEnabled || loadedPluginCount == 0 || runtime == null) {
             return;
         }
         synchronized (pythonLock) {
+            if (!pluginSystemEnabled || loadedPluginCount == 0 || runtime == null) {
+                return;
+            }
             try {
                 ensureRuntimeLocked().callAttr(method, args);
                 collectRuntimeErrorsLocked();
@@ -589,6 +687,9 @@ public final class IrongramPluginsController {
     }
 
     private void ensurePluginLoadedLocked(String pluginId) {
+        if (!pluginSystemEnabled) {
+            throw new IllegalStateException("The plugin system is disabled");
+        }
         if (!preferences.getBoolean(ENABLED_PREFIX + pluginId, false)) {
             throw new IllegalStateException("Enable this plugin before opening its settings");
         }
@@ -602,6 +703,9 @@ public final class IrongramPluginsController {
                     pluginFile(pluginId).getAbsolutePath(),
                     getPythonLibrariesDirectory().getAbsolutePath()
             );
+            if (!pluginSystemEnabled) {
+                return;
+            }
             pythonRuntime.callAttr(
                     "load_plugin",
                     pluginId,
@@ -621,6 +725,9 @@ public final class IrongramPluginsController {
     }
 
     private PyObject requireLoadedPluginLocked(String pluginId) {
+        if (!pluginSystemEnabled) {
+            throw new IllegalStateException("The plugin system is disabled");
+        }
         if (!preferences.getBoolean(ENABLED_PREFIX + pluginId, false)) {
             throw new IllegalStateException("This plugin is disabled");
         }

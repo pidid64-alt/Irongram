@@ -50,11 +50,11 @@ class ExampleRewriter(BasePlugin):
   - `HookResult` supports default, cancel, modify, and modify-final outcomes. Objects passed by the
     app should normally be mutated in place.
 - `add_on_send_message_hook(priority=0)` and `on_send_message_hook` for outgoing message params.
-- `__requirements__` downloads dependencies from PyPI. The installer verifies wheel SHA-256 and
-  accepts only pure-Python wheels (`none-any`). Native extensions, direct URLs, and optional
-  dependency extras are not supported. Requirements share one app-wide library directory, so
-  incompatible versions can prevent a plugin from enabling. Network access is required the first
-  time a dependency is installed.
+- The app bundles `requests` for common exteraGram-style plugins. Other `__requirements__` are
+  downloaded from PyPI; the installer verifies wheel SHA-256 and accepts only pure-Python wheels
+  (`none-any`). Native extensions, direct URLs, and optional dependency extras are not supported.
+  Requirements share one app-wide library directory, so incompatible versions can prevent a
+  plugin from enabling. Network access is required the first time a dependency is installed.
 - For enabled plugins, `create_settings()` is rendered in a per-plugin settings screen for the
   built-in `Header`, `Divider`, `Switch`, `Selector`, `Input`, `EditText`, and `Text` declarations.
   Switch, selector, and text input values are stored through `BasePlugin.set_setting()` and
@@ -63,7 +63,7 @@ class ExampleRewriter(BasePlugin):
 - `Custom` declarations (including existing `UItem`, Android `View`, and
   `SimpleSettingFactory` values) are shown as unsupported rows; custom Java/Android view factories
   are not executed. `EditText` supports multiline input and `max_length`; custom input masks and
-  long-click callbacks are not implemented.
+  custom settings long-click callbacks are not implemented.
 
 ## Not yet compatible
 
@@ -71,9 +71,15 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
 - Arbitrary Xposed-style Java method hooking (`hook_method`, `MethodHook`, `MethodReplacement`) is
   not implemented. Calling `BasePlugin.hook_method` raises `NotImplementedError`.
-- Plugin menu injection, custom Android-view settings factories, application lifecycle events,
-  and the exteraGram convenience modules (client, Android, dialog, bulletin, reflection helpers,
-  etc.) are not implemented. The supported built-in settings controls are a limited subset of the
+- A narrow subset of `android_utils` is implemented in
+  `TMessagesProj/src/main/python/android_utils.py`: `R`, click/long-click listener wrappers,
+  UI-thread scheduling, basic legacy string logging, and clipboard copying. This is not full
+  exteraGram utility compatibility.
+- The current `client_utils` subset provides `get_send_messages_helper`, `get_last_fragment`,
+  and `run_on_queue`; `ui.bulletin.BulletinHelper` provides error and success bulletins. Other
+  client, dialog, bulletin, and reflection APIs are not implemented.
+- Plugin menu injection, custom Android-view settings factories, and application lifecycle events
+  are not implemented. The supported built-in settings controls are a limited subset of the
   exteraGram settings API.
 - `.elyx` / `.eaf` structured plugin formats and app/SDK version constraints are not implemented.
 

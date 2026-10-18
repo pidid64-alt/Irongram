@@ -73,6 +73,15 @@
     <string name="IrongramDownloads">Загрузки</string>
     <string name="IrongramRebrandCredit">Ребрендинг в Irongram выполнен Arena.ai Agent Mode 16.10.2026. Исходный проект: Nekogram.</string>
     <string name="Plugins">Плагины</string>
+    <string name="PluginSystemToggle">Включить систему плагинов</string>
+    <string name="PluginSystemToggleDescription">Отключите, чтобы приостановить все плагины. Индивидуальные переключатели сохраняются.</string>
+    <string name="InstalledPlugins">Установленные плагины</string>
+    <string name="NoPluginSearchResults">Плагины не найдены.</string>
+    <string name="PluginSystemPaused">Система плагинов приостановлена, поэтому этот плагин не запущен.</string>
+    <string name="PluginSettingsUnavailable">Включите систему плагинов и сам плагин, чтобы открыть его настройки.</string>
+    <string name="PluginEnabledWhilePaused">Плагин включён, но система плагинов приостановлена.</string>
+    <string name="PluginSystemEnabledStatus">Система плагинов включена.</string>
+    <string name="PluginSystemDisabledStatus">Система плагинов выключена.</string>
     <string name="PluginManagerWarningTitle">Устанавливайте только доверенные плагины</string>
     <string name="PluginManagerWarning">Python-плагины выполняются внутри Irongram и не изолированы. Они могут получать доступ к данным аккаунта, файлам приложения и сети. Поддерживаются pure-Python wheel с PyPI, событийные хуки и основные элементы настроек; нативные расширения, пользовательские Android-представления, меню плагинов и произвольные Xposed-хуки методов не поддерживаются.</string>
     <string name="InstallPlugin">Установить Python-плагин (.py / .plugin)</string>

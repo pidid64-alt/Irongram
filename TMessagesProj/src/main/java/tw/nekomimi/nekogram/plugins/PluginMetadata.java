@@ -19,14 +19,16 @@ public final class PluginMetadata {
     public final String version;
     public final String author;
     public final String description;
+    public final String icon;
     public final List<String> requirements;
 
-    private PluginMetadata(String id, String name, String version, String author, String description, List<String> requirements) {
+    private PluginMetadata(String id, String name, String version, String author, String description, String icon, List<String> requirements) {
         this.id = id;
         this.name = name;
         this.version = version;
         this.author = author;
         this.description = description;
+        this.icon = icon;
         this.requirements = Collections.unmodifiableList(requirements);
     }
 
@@ -48,6 +50,7 @@ public final class PluginMetadata {
                 nonEmpty(readValue(source, "version"), "0.0.0"),
                 nonEmpty(readValue(source, "author"), ""),
                 nonEmpty(readValue(source, "description"), ""),
+                nonEmpty(readValue(source, "icon"), ""),
                 readRequirements(source)
         );
     }
