@@ -1,12 +1,14 @@
-"""Pure-Python wheel installer for plugin __requirements__ metadata.
+"""Shared pure-Python dependency installer for Irongram plugins.
 
-For safety and compatibility this intentionally accepts only wheels whose ABI and platform
-are both "none" and "any". Native extensions are not installable into the app's Python runtime.
+It resolves declared PEP 508 requirements and can install simple missing imports on demand.
+For safety and compatibility, only wheels whose ABI and platform are both "none" and "any"
+are accepted. Native extensions are not installable into the app's Python runtime.
 """
 
 import ast
 import email.parser
 import hashlib
+import importlib
 import importlib.metadata
 import os
 import platform
@@ -30,6 +32,22 @@ MAX_WHEEL_SIZE = 30 * 1024 * 1024
 MAX_TOTAL_WHEEL_SIZE = 120 * 1024 * 1024
 MAX_UNPACKED_SIZE = 120 * 1024 * 1024
 USER_AGENT = "Irongram-Python-Plugin-Manager/1.0"
+
+# These roots are Java namespaces on Android, not Python distributions. Never
+# send them to PyPI when a plugin uses a direct Java package import.
+_JAVA_PACKAGE_ROOTS = frozenset({
+    "android", "androidx", "com", "dalvik", "java", "javax", "kotlin", "org", "sun"
+})
+
+# A small set of well-known Python import names which differ from their PyPI
+# distribution names. Plugins can always use __requirements__ for other aliases.
+_IMPORT_DISTRIBUTIONS = {
+    "attr": "attrs",
+    "bs4": "beautifulsoup4",
+    "dateutil": "python-dateutil",
+    "dotenv": "python-dotenv",
+    "yaml": "PyYAML",
+}
 
 
 def _read_plugin_requirements(plugin_path):
@@ -343,18 +361,49 @@ def _install_wheels(wheel_paths, library_directory):
         shutil.rmtree(staging, ignore_errors=True)
 
 
-def install_plugin_requirements(plugin_path, library_directory):
-    requirements = _read_plugin_requirements(plugin_path)
+def _requirement_for_import(module_name):
+    if not isinstance(module_name, str):
+        return None
+    import_name = module_name.strip().split(".", 1)[0]
+    if not import_name.isidentifier() or import_name.startswith("_"):
+        return None
+    if import_name in sys.stdlib_module_names or import_name in _JAVA_PACKAGE_ROOTS:
+        return None
+    return _IMPORT_DISTRIBUTIONS.get(import_name, import_name)
+
+
+def install_python_requirements(requirements, library_directory):
+    """Install PEP 508 requirements into the shared app-private library directory."""
+    requirements = list(requirements or [])
+    library_directory = os.path.abspath(str(library_directory))
+    if library_directory not in sys.path:
+        sys.path.insert(0, library_directory)
     if not requirements:
-        if library_directory not in sys.path:
-            sys.path.insert(0, library_directory)
         return []
 
     os.makedirs(library_directory, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="irongram-wheels-") as temporary_directory:
         wheel_paths = _resolve(requirements, library_directory, temporary_directory)
-        _install_wheels(wheel_paths, library_directory)
+        if wheel_paths:
+            _install_wheels(wheel_paths, library_directory)
 
-    if library_directory not in sys.path:
-        sys.path.insert(0, library_directory)
+    importlib.invalidate_caches()
     return sorted(wheel_paths.keys())
+
+
+def install_missing_import(module_name, library_directory):
+    """Install a same-name pure-Python PyPI package for a missing plugin import.
+
+    Returns ``None`` when the import is a stdlib/Java namespace or cannot be
+    mapped safely. An empty list means a candidate was already present, while
+    a non-empty list names packages newly installed into the shared library.
+    """
+    requirement = _requirement_for_import(module_name)
+    if requirement is None:
+        return None
+    return install_python_requirements([requirement], library_directory)
+
+
+def install_plugin_requirements(plugin_path, library_directory):
+    requirements = _read_plugin_requirements(plugin_path)
+    return install_python_requirements(requirements, library_directory)

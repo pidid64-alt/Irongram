@@ -85,7 +85,7 @@
     <string name="PluginSystemEnabledStatus">Plugin system enabled.</string>
     <string name="PluginSystemDisabledStatus">Plugin system disabled.</string>
     <string name="PluginManagerWarningTitle">Only install plugins you trust</string>
-    <string name="PluginManagerWarning">Python plugins run inside Irongram and are not sandboxed. They can access account data, app files, and the network. PyPI pure-Python wheels, event hooks, and basic plugin settings controls are supported; native extensions, custom Android views, plugin menus, and arbitrary Xposed method hooks are not.</string>
+    <string name="PluginManagerWarning">Python plugins run inside Irongram and are not sandboxed. They can access account data, app files, and the network. Dependencies are installed from PyPI at runtime into a shared library directory; missing imports during plugin loading may be installed automatically. Only pure-Python wheels are supported. Native extensions, custom Android views, plugin menus, and arbitrary Xposed method hooks are not.</string>
     <string name="InstallPlugin">Install Python plugin (.py / .plugin)</string>
     <string name="PluginPreviewTitle">Plugin preview</string>
     <string name="PluginPreviewLoading">Reading plugin information…</string>

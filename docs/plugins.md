@@ -50,11 +50,17 @@ class ExampleRewriter(BasePlugin):
   - `HookResult` supports default, cancel, modify, and modify-final outcomes. Objects passed by the
     app should normally be mutated in place.
 - `add_on_send_message_hook(priority=0)` and `on_send_message_hook` for outgoing message params.
-- The app bundles `requests` for common exteraGram-style plugins. Other `__requirements__` are
-  downloaded from PyPI; the installer verifies wheel SHA-256 and accepts only pure-Python wheels
-  (`none-any`). Native extensions, direct URLs, and optional dependency extras are not supported.
-  Requirements share one app-wide library directory, so incompatible versions can prevent a
-  plugin from enabling. Network access is required the first time a dependency is installed.
+- The app bundles `requests` for common exteraGram-style plugins. All plugins share an app-private
+  Python library directory. Declared `__requirements__` are installed from PyPI the first time a
+  plugin is enabled; during startup, a missing import can also trigger installation of its matching
+  PyPI project (up to eight auto-detected imports per plugin). Use `__requirements__` to pin versions
+  or when a PyPI distribution name differs from its import name. Installed packages are
+  reused by every plugin, so adding a pure-Python dependency does not require rebuilding Irongram.
+  The installer resolves transitive requirements, verifies wheel SHA-256, and accepts only
+  pure-Python `none-any` wheels. Native extensions, direct URLs, and optional dependency extras are
+  not supported. Network access is required the first time a dependency is installed; incompatible
+  versions can still prevent a plugin from enabling. Java namespaces such as `org.telegram` are not
+  Python packages and must use `java.jclass` or a supported Irongram helper instead.
 - For enabled plugins, `create_settings()` is rendered in a per-plugin settings screen for the
   built-in `Header`, `Divider`, `Switch`, `Selector`, `Input`, `EditText`, and `Text` declarations.
   Switch, selector, and text input values are stored through `BasePlugin.set_setting()` and

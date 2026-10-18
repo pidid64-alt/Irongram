@@ -83,7 +83,7 @@
     <string name="PluginSystemEnabledStatus">Система плагинов включена.</string>
     <string name="PluginSystemDisabledStatus">Система плагинов выключена.</string>
     <string name="PluginManagerWarningTitle">Устанавливайте только доверенные плагины</string>
-    <string name="PluginManagerWarning">Python-плагины выполняются внутри Irongram и не изолированы. Они могут получать доступ к данным аккаунта, файлам приложения и сети. Поддерживаются pure-Python wheel с PyPI, событийные хуки и основные элементы настроек; нативные расширения, пользовательские Android-представления, меню плагинов и произвольные Xposed-хуки методов не поддерживаются.</string>
+    <string name="PluginManagerWarning">Python-плагины выполняются внутри Irongram и не изолированы. Они могут получать доступ к данным аккаунта, файлам приложения и сети. Зависимости устанавливаются из PyPI во время работы и доступны всем плагинам через общую библиотеку; отсутствующие модули при загрузке плагина могут устанавливаться автоматически. Поддерживаются только pure-Python wheel. Нативные расширения, пользовательские Android-представления, меню плагинов и произвольные Xposed-хуки методов не поддерживаются.</string>
     <string name="InstallPlugin">Установить Python-плагин (.py / .plugin)</string>
     <string name="PluginPreviewTitle">Предпросмотр плагина</string>
     <string name="PluginPreviewLoading">Чтение данных плагина…</string>
