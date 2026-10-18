@@ -81,9 +81,9 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
   `TMessagesProj/src/main/python/android_utils.py`: `R`, click/long-click listener wrappers,
   UI-thread scheduling, basic legacy string logging, and clipboard copying. This is not full
   exteraGram utility compatibility.
-- The current `client_utils` subset provides `get_send_messages_helper`, `get_last_fragment`,
-  and `run_on_queue`; `ui.bulletin.BulletinHelper` provides error and success bulletins. Other
-  client, dialog, bulletin, and reflection APIs are not implemented.
+- The current `client_utils` subset provides `get_send_messages_helper`, `get_file_loader`,
+  `get_last_fragment`, and `run_on_queue`; `ui.bulletin.BulletinHelper` provides error and success
+  bulletins. Other client, dialog, bulletin, and reflection APIs are not implemented.
 - For the QR Generator sample, direct imports of `org.telegram.messenger.ApplicationLoader` and
   `org.telegram.ui.ActionBar.AlertDialog` are mapped to those Java classes. This is a narrow bridge,
   not general Java-package or method-hook compatibility; use `java.jclass` for other Java classes.

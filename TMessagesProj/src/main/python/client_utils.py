@@ -1,7 +1,7 @@
 """Small exteraGram ``client_utils`` subset used by current Irongram plugins.
 
-This module is intentionally limited to the queue, fragment, and send-helper accessors
-currently used by the included compatibility examples. It is not the full exteraGram API.
+This module provides selected queue, fragment, send-helper, and file-loader accessors.
+It is intentionally not the full exteraGram API.
 """
 
 import threading
@@ -55,6 +55,13 @@ def get_send_messages_helper(account=None):
     if account is None:
         account = _java_class("org.telegram.messenger.UserConfig").selectedAccount
     return _java_class("org.telegram.messenger.SendMessagesHelper").getInstance(int(account))
+
+
+def get_file_loader(account=None):
+    """Return FileLoader for ``account`` or the currently selected account."""
+    if account is None:
+        account = _java_class("org.telegram.messenger.UserConfig").selectedAccount
+    return _java_class("org.telegram.messenger.FileLoader").getInstance(int(account))
 
 
 def get_last_fragment():

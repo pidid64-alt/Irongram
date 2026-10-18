@@ -12,6 +12,7 @@
 -keep class org.telegram.messenger.AndroidUtilities { *; }
 -keep class org.telegram.messenger.LocaleController { *; }
 -keep class org.telegram.messenger.DispatchQueue { *; }
+-keep class org.telegram.messenger.FileLoader { *; }
 -keep class org.telegram.messenger.UserConfig { *; }
 -keep class org.telegram.messenger.SendMessagesHelper { *; }
 -keep class org.telegram.messenger.SendMessagesHelper$SendMessageParams { *; }
