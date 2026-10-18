@@ -7,6 +7,21 @@
 -keep @androidx.annotation.Keep class * { *; }
 -keepclasseswithmembers class * { @androidx.annotation.Keep *; }
 
+# Chaquopy plugin adapters look up these Irongram classes and members by name.
+-keep class org.telegram.messenger.ApplicationLoader { *; }
+-keep class org.telegram.messenger.AndroidUtilities { *; }
+-keep class org.telegram.messenger.LocaleController { *; }
+-keep class org.telegram.messenger.DispatchQueue { *; }
+-keep class org.telegram.messenger.UserConfig { *; }
+-keep class org.telegram.messenger.SendMessagesHelper { *; }
+-keep class org.telegram.messenger.Utilities { *; }
+-keep class org.telegram.messenger.R$raw { *; }
+-keep class org.telegram.ui.LaunchActivity { *; }
+-keep class org.telegram.ui.ActionBar.AlertDialog { *; }
+-keep class org.telegram.ui.ActionBar.AlertDialog$Builder { *; }
+-keep class org.telegram.ui.Components.BulletinFactory { *; }
+-keep class org.telegram.ui.Components.BulletinFactory$* { *; }
+
 -keep class org.webrtc.* { *; }
 -keep class org.webrtc.audio.* { *; }
 -keep class org.webrtc.voiceengine.* { *; }
