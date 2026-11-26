@@ -9,6 +9,10 @@ on:
       - 'TMessagesProj_App/src/main/java/**'
       - 'TMessagesProj_App/build.gradle'
       - 'build.gradle'
+      - 'settings.gradle'
+      - 'Tools/maven/**'
+      - 'plugins-pysdk/**'
+      - 'tools/ci/**'
       - '.github/workflows/java-compile-check.yml'
 
 jobs:
