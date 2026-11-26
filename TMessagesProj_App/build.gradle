@@ -85,6 +85,7 @@ android {
     defaultConfig.versionCode = Integer.parseInt(APP_VERSION_CODE)
 
     defaultConfig {
+        minSdkVersion 24
         versionName APP_VERSION_NAME
 
         multiDexEnabled true
