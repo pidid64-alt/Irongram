@@ -46,7 +46,6 @@ import tw.nekomimi.nekogram.accessibility.AccessibilitySettingsActivity;
 import tw.nekomimi.nekogram.helpers.CloudSettingsHelper;
 import tw.nekomimi.nekogram.helpers.PasscodeHelper;
 import tw.nekomimi.nekogram.helpers.remote.ConfigHelper;
-import tw.nekomimi.nekogram.plugins.ui.PluginsActivity;
 
 public class NekoSettingsActivity extends BaseNekoSettingsActivity implements FactorAnimator.Target {
 
@@ -62,8 +61,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
     private final int chatRow = rowId++;
     private final int passcodeRow = rowId++;
     private final int experimentRow = rowId++;
-    private final int accessibilityRow = rowId++;
     private final int pluginsRow = rowId++;
+    private final int accessibilityRow = rowId++;
 
     private final int channelRow = rowId++;
     private final int websiteRow = rowId++;
@@ -170,15 +169,15 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             items.add(UItem.asButton(passcodeRow, R.drawable.msg_secret, LocaleController.getString(R.string.PasscodeNeko)).slug("passcode"));
         }
         items.add(UItem.asButton(experimentRow, R.drawable.msg_fave, LocaleController.getString(R.string.NotificationsOther)).slug("experiment"));
+        items.add(UItem.asButton(pluginsRow, R.drawable.msg_fave, LocaleController.getString(R.string.Plugins)).slug("plugins"));
         AccessibilityManager am = (AccessibilityManager) ApplicationLoader.applicationContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
         if (am != null && am.isTouchExplorationEnabled()) {
             items.add(UItem.asButton(accessibilityRow, LocaleController.getString(R.string.AccessibilitySettings)).slug("accessibility"));
         }
-        items.add(UItem.asButton(pluginsRow, R.drawable.msg_settings, LocaleController.getString(R.string.Plugins)).slug("plugins"));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asButton(channelRow, R.drawable.msg_channel, LocaleController.getString(R.string.OfficialChannel), "@" + LocaleController.getString(R.string.OfficialChannelUsername)).slug("channel"));
-        items.add(UItem.asButton(websiteRow, R.drawable.msg_language, LocaleController.getString(R.string.OfficialSite), "nekogram.app").slug("website"));
+        items.add(UItem.asButton(channelRow, R.drawable.msg_channel, LocaleController.getString(R.string.IrongramUpstreamChannel), "@" + LocaleController.getString(R.string.OfficialChannelUsername)).slug("channel"));
+        items.add(UItem.asButton(websiteRow, R.drawable.msg_language, LocaleController.getString(R.string.IrongramDownloads), "GitHub Releases").slug("website"));
         items.add(UItem.asButton(sourceCodeRow, R.drawable.msg_link, LocaleController.getString(R.string.ViewSourceCode), "GitHub").slug("sourceCode"));
         items.add(UItem.asButtonSubtext(translationRow, R.drawable.msg_translate, LocaleController.getString(R.string.Translation), LocaleController.getString(R.string.TranslationAbout)).slug("translation"));
         items.add(UItem.asButtonSubtext(donateRow, R.drawable.msg_input_like, LocaleController.getString(R.string.Donate), LocaleController.getString(R.string.DonateAbout)).slug("donate"));
@@ -193,6 +192,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             }
             items.add(UItem.asShadow(null));
         }
+        items.add(UItem.asShadow(LocaleController.getString(R.string.IrongramRebrandCredit)).setEnabled(false));
     }
 
     @Override
@@ -214,10 +214,10 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             presentFragment(new NekoPasscodeSettingsActivity());
         } else if (id == experimentRow) {
             presentFragment(new NekoExperimentalSettingsActivity());
+        } else if (id == pluginsRow) {
+            presentFragment(new IrongramPluginsActivity());
         } else if (id == accessibilityRow) {
             presentFragment(new AccessibilitySettingsActivity());
-        } else if (id == pluginsRow) {
-            presentFragment(new PluginsActivity());
         } else if (id == channelRow) {
             getMessagesController().openByUserName(LocaleController.getString(R.string.OfficialChannelUsername), this, 1);
         } else if (id == donateRow) {
@@ -225,9 +225,9 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         } else if (id == translationRow) {
             Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram");
         } else if (id == websiteRow) {
-            Browser.openUrl(getParentActivity(), "https://nekogram.app");
+            Browser.openUrl(getParentActivity(), "https://github.com/pidid64-alt/Irongram/releases");
         } else if (id == sourceCodeRow) {
-            Browser.openUrl(getParentActivity(), "https://github.com/Nekogram/Nekogram");
+            Browser.openUrl(getParentActivity(), "https://github.com/pidid64-alt/Irongram");
         } else if (id >= sponsorRow) {
             var news = newsList.get(id - sponsorRow);
             Browser.openUrl(getParentActivity(), news.url);
@@ -327,12 +327,11 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             fragment.scrollToRow("useSystemEmoji", null);
         }));
 
-        searchResultList.add(new SearchResult(20000, LocaleController.getString(R.string.OfficialChannel), "@" + LocaleController.getString(R.string.OfficialChannelUsername), R.drawable.msg2_help, () -> getMessagesController().openByUserName(LocaleController.getString(R.string.OfficialChannelUsername), this, 1)));
-        searchResultList.add(new SearchResult(20001, LocaleController.getString(R.string.OfficialSite), "nekogram.app", R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://nekogram.app")));
-        searchResultList.add(new SearchResult(20002, LocaleController.getString(R.string.ViewSourceCode), "GitHub", R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://github.com/Nekogram/Nekogram")));
+        searchResultList.add(new SearchResult(20000, LocaleController.getString(R.string.IrongramUpstreamChannel), "@" + LocaleController.getString(R.string.OfficialChannelUsername), R.drawable.msg2_help, () -> getMessagesController().openByUserName(LocaleController.getString(R.string.OfficialChannelUsername), this, 1)));
+        searchResultList.add(new SearchResult(20001, LocaleController.getString(R.string.IrongramDownloads), "GitHub Releases", R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://github.com/pidid64-alt/Irongram/releases")));
+        searchResultList.add(new SearchResult(20002, LocaleController.getString(R.string.ViewSourceCode), "GitHub", R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://github.com/pidid64-alt/Irongram")));
         searchResultList.add(new SearchResult(20003, LocaleController.getString(R.string.Translation), LocaleController.getString(R.string.TranslationAbout), R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram")));
         searchResultList.add(new SearchResult(20004, LocaleController.getString(R.string.Donate), LocaleController.getString(R.string.DonateAbout), R.drawable.msg2_help, () -> presentFragment(new NekoDonateActivity())));
-        searchResultList.add(new SearchResult(20005, LocaleController.getString(R.string.Plugins), R.drawable.msg_settings, () -> presentFragment(new PluginsActivity())));
 
         return searchResultList;
     }

@@ -7,6 +7,23 @@
 -keep @androidx.annotation.Keep class * { *; }
 -keepclasseswithmembers class * { @androidx.annotation.Keep *; }
 
+# Chaquopy plugin adapters look up these Irongram classes and members by name.
+-keep class org.telegram.messenger.ApplicationLoader { *; }
+-keep class org.telegram.messenger.AndroidUtilities { *; }
+-keep class org.telegram.messenger.LocaleController { *; }
+-keep class org.telegram.messenger.DispatchQueue { *; }
+-keep class org.telegram.messenger.FileLoader { *; }
+-keep class org.telegram.messenger.UserConfig { *; }
+-keep class org.telegram.messenger.SendMessagesHelper { *; }
+-keep class org.telegram.messenger.SendMessagesHelper$SendMessageParams { *; }
+-keep class org.telegram.messenger.Utilities { *; }
+-keep class org.telegram.messenger.R$raw { *; }
+-keep class org.telegram.ui.LaunchActivity { *; }
+-keep class org.telegram.ui.ActionBar.AlertDialog { *; }
+-keep class org.telegram.ui.ActionBar.AlertDialog$Builder { *; }
+-keep class org.telegram.ui.Components.BulletinFactory { *; }
+-keep class org.telegram.ui.Components.BulletinFactory$* { *; }
+
 -keep class org.webrtc.* { *; }
 -keep class org.webrtc.audio.* { *; }
 -keep class org.webrtc.voiceengine.* { *; }
@@ -77,17 +94,3 @@
 
 -dontwarn android.support.annotation.*
 -dontwarn androidx.compose.**
-
-# Irongram plugin system: the engine and the plugin API are referenced from external dex files,
-# so their names must not be obfuscated.
--keep class tw.nekomimi.nekogram.plugins.** { *; }
--keep class * extends tw.nekomimi.nekogram.plugins.BasePlugin { *; }
--keep class tw.nekomimi.nekogram.plugins.settings.** { *; }
-
-# Plugin API touches these classes directly, keep the names stable across release builds.
--keep class org.telegram.messenger.SendMessagesHelper$SendMessageParams { *; }
--keepclassmembers class org.telegram.messenger.SendMessagesHelper$SendMessageParams { <fields>; }
--keepclassmembers class org.telegram.messenger.NotificationCenter { public static final int *; }
--keepnames class org.telegram.messenger.NotificationCenter
--keepnames class org.telegram.messenger.BuildConfig
--keepnames class org.telegram.ui.ActionBar.BaseFragment

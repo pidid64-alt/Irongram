@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [ "dev", "ci" ]
+    branches: [ "dev", "ci", "arena/964e9a23-irongram" ]
     paths-ignore:
       - '**.md'
       - '.github/**'
@@ -12,7 +12,10 @@ on:
 
 jobs:
   build:
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    # The Google Services config is stored in this GitHub environment.
+    environment: GOOGLE_SERVICES_JSON
+    # GitHub-hosted runner; no separate Blacksmith runner pool is required.
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write
       attestations: write
@@ -22,6 +25,7 @@ jobs:
       CCACHE_HARDLINK: "true"
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "10G"
+      CMAKE_BUILD_PARALLEL_LEVEL: "2"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,6 +36,11 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
 
       - name: Set up ccache
         uses: Chocobo1/setup-ccache-action@v1
@@ -53,35 +62,110 @@ jobs:
           mkdir -p ~/.gradle
           echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
           echo 'org.gradle.parallel=true' >> ~/.gradle/gradle.properties
-          echo 'org.gradle.jvmargs=-Xmx56g -Dfile.encoding=UTF-8 -XX:+UseParallelGC' >> ~/.gradle/gradle.properties
+          echo 'org.gradle.workers.max=2' >> ~/.gradle/gradle.properties
+          echo 'org.gradle.jvmargs=-Xmx8g -Dfile.encoding=UTF-8 -XX:+UseParallelGC' >> ~/.gradle/gradle.properties
           echo 'android.native.buildOutput=verbose' >> ~/.gradle/gradle.properties
 
       - name: Configure Signing
+        env:
+          KEYSTORE_JKS: ${{ secrets.KEYSTORE_JKS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "storeFile=${{ github.workspace }}/keystore.jks" >> local.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
-          
-          echo "${{ secrets.KEYSTORE_JKS }}" | base64 --decode > keystore.jks
+          if [ -z "$KEYSTORE_JKS" ]; then
+            echo "No release keystore configured; Gradle will use debug signing."
+          else
+            if [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+              echo "::error::Set KEYSTORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD when KEYSTORE_JKS is configured."
+              exit 1
+            fi
+            printf 'storeFile=%s/keystore.jks\n' "$GITHUB_WORKSPACE" >> local.properties
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD" >> local.properties
+            printf 'keyAlias=%s\n' "$KEY_ALIAS" >> local.properties
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD" >> local.properties
+            if ! printf '%s' "$KEYSTORE_JKS" | base64 --decode > keystore.jks; then
+              echo "::error::KEYSTORE_JKS must contain Base64-encoded keystore bytes."
+              exit 1
+            fi
+          fi
 
       - name: Configure Secrets
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SENTRY_PROPERTIES: ${{ secrets.SENTRY_PROPERTIES }}
         run: |
-          echo "apiId=${{ secrets.API_ID }}" >> local.properties
-          echo "apiHash=${{ secrets.API_HASH }}" >> local.properties
+          if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+            echo "::error::Set API_ID and API_HASH secrets in the configured GitHub environment."
+            exit 1
+          fi
+          if ! [[ "$API_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::API_ID must be numeric."
+            exit 1
+          fi
+          printf 'apiId=%s\n' "$API_ID" >> local.properties
+          printf 'apiHash=%s\n' "$API_HASH" >> local.properties
           echo "helperBotId=${{ secrets.HELPER_BOT_ID }}" >> local.properties
           echo "helperBotUsername=${{ secrets.HELPER_BOT_USERNAME }}" >> local.properties
           echo "sentryDsn=${{ secrets.SENTRY_DSN }}" >> local.properties
           echo "mapsApiKey=${{ secrets.MAPS_API_KEY }}" >> local.properties
 
-          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > TMessagesProj_App/google-services.json
-          echo "${{ secrets.SENTRY_PROPERTIES }}" | base64 --decode > sentry.properties
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          value = os.environ.get("GOOGLE_SERVICES_JSON", "")
+          if not value.strip():
+              raise SystemExit("::error title=Missing secret::Set the Actions secret GOOGLE_SERVICES_JSON.")
+
+          try:
+              config = json.loads(value)
+              contents = value
+          except json.JSONDecodeError:
+              try:
+                  decoded = base64.b64decode(value)
+                  contents = decoded.decode("utf-8-sig")
+                  config = json.loads(contents)
+              except Exception:
+                  raise SystemExit("::error title=Invalid secret::GOOGLE_SERVICES_JSON must be valid JSON or Base64 of google-services.json.") from None
+
+          if not isinstance(config, dict):
+              raise SystemExit("::error title=Invalid Google Services JSON::Expected a JSON object at the document root.")
+
+          packages = {
+              client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              for client in config.get("client", [])
+              if isinstance(client, dict)
+          }
+          if "tw.nekomimi.nekogram" not in packages:
+              raise SystemExit("::error title=Wrong Firebase app::No client for Android package tw.nekomimi.nekogram was found.")
+
+          Path("TMessagesProj_App/google-services.json").write_text(contents, encoding="utf-8")
+          print("Google Services JSON validated for tw.nekomimi.nekogram.")
+          PY
+          if [ -n "$SENTRY_PROPERTIES" ]; then
+            if ! printf '%s' "$SENTRY_PROPERTIES" | base64 --decode > sentry.properties; then
+              echo "::error::SENTRY_PROPERTIES must be Base64-encoded."
+              exit 1
+            fi
+          else
+            rm -f sentry.properties
+            echo "SENTRY_PROPERTIES not configured; Sentry source upload will be skipped."
+          fi
 
       - name: Build with Gradle
         run: |
           ./gradlew assembleRelease
           ./gradlew bundlePlay
-          ./gradlew sentryUploadSourceBundlePlay
+          if [ -s sentry.properties ]; then
+            ./gradlew sentryUploadSourceBundlePlay
+          else
+            echo "Skipping Sentry source upload because SENTRY_PROPERTIES is not configured."
+          fi
 
       - name: Attest
         uses: actions/attest@v4

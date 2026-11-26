@@ -53,7 +53,7 @@ import java.util.concurrent.CountDownLatch;
 import tw.nekomimi.nekogram.FirebaseFix;
 import tw.nekomimi.nekogram.helpers.AnalyticsHelper;
 import tw.nekomimi.nekogram.helpers.CronetHelper;
-import tw.nekomimi.nekogram.plugins.PluginsController;
+import tw.nekomimi.nekogram.plugins.IrongramPluginsController;
 
 public class ApplicationLoader extends Application {
 
@@ -284,6 +284,7 @@ public class ApplicationLoader extends Application {
             DownloadController.getInstance(a);
         }
         BillingController.getInstance().startConnection();
+        IrongramPluginsController.getInstance().loadEnabledPlugins();
     }
 
     public ApplicationLoader() {
@@ -368,10 +369,6 @@ public class ApplicationLoader extends Application {
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
-
-        // Irongram: the plugin engine is initialized after the app context and the main
-        // handler are ready. Loading itself happens on the global queue.
-        PluginsController.getInstance().init();
 
         //if (BuildConfig.DEBUG_PRIVATE_VERSION) {
         //    Choreographer60FpsContent.getInstance().addFrameCallback(debugEverySecondChecks, 1);
