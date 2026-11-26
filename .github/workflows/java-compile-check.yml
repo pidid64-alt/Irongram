@@ -53,6 +53,18 @@ jobs:
         run: |
           printf 'apiId=1\napiHash=0123456789abcdef0123456789abcdef\nmapsApiKey=placeholder\nhelperBotId=1\nhelperBotUsername=placeholder\n' >> local.properties
 
+      - name: Configure Google Services placeholder
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > TMessagesProj_App/google-services.json
+          else
+            cat > TMessagesProj_App/google-services.json <<'JSON'
+          {"project_info":{"project_number":"123456789","project_id":"compile-only","storage_bucket":"compile-only.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789:android:0123456789abcdef","android_client_info":{"package_name":"tw.nekomimi.nekogram"}},"api_key":[{"current_key":"compile-only"}],"services":{}}],"configuration_version":"1"}
+          JSON
+          fi
+
       - name: Compile Android sources
         run: |
           set +e
