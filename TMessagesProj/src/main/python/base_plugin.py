@@ -120,6 +120,7 @@ class BasePlugin:
         self.logger = _PluginLogger(self)
         self._registered_hooks = []
         self._registered_send_hook = False
+        self._registered_menu_items = []
 
     def on_plugin_load(self):
         pass
@@ -173,15 +174,26 @@ class BasePlugin:
         if self._runtime is not None:
             self._runtime.unregister_plugin_hooks(self)
         self._registered_hooks.clear()
+        self._registered_menu_items = []
         self._registered_send_hook = False
 
     def add_menu_item(self, item):
-        raise NotImplementedError(
-            "Plugin menu injection is not available in this Irongram build."
-        )
+        """Register a ``MenuItemData`` entry; returns a token usable with ``remove_menu_item``."""
+        if self._runtime is None:
+            raise RuntimeError("Plugin runtime is not initialized")
+        token = self._runtime.register_menu_item(self, item)
+        self._registered_menu_items.append(token)
+        return token
 
     def remove_menu_item(self, item_id):
-        return False
+        if self._runtime is None:
+            return False
+        removed = self._runtime.unregister_menu_item(self, item_id)
+        if removed:
+            self._registered_menu_items = [
+                token for token in self._registered_menu_items if token != item_id
+            ]
+        return removed
 
     def get_setting(self, key, default=None):
         values = self._read_settings()

@@ -11,6 +11,7 @@ from dependency_manager import install_missing_import, install_plugin_requiremen
 _PLUGINS = {}
 _REQUEST_HOOKS = []
 _SEND_MESSAGE_HOOKS = []
+_MENU_ITEMS = []
 _ERRORS = []
 _NEXT_TOKEN = 1
 _NEXT_SETTINGS_PAGE = 1
@@ -64,6 +65,114 @@ def register_send_message_hook(plugin, priority=0):
 def unregister_plugin_hooks(plugin):
     _REQUEST_HOOKS[:] = [hook for hook in _REQUEST_HOOKS if hook["plugin"] is not plugin]
     _SEND_MESSAGE_HOOKS[:] = [hook for hook in _SEND_MESSAGE_HOOKS if hook["plugin"] is not plugin]
+    _MENU_ITEMS[:] = [item for item in _MENU_ITEMS if item["plugin"] is not plugin]
+
+
+def _menu_type_name(menu_type):
+    value = getattr(menu_type, "value", menu_type)
+    return str(value)
+
+
+def register_menu_item(plugin, item):
+    """Register a ``MenuItemData`` for ``plugin`` and return its token."""
+    if item is None:
+        raise TypeError("add_menu_item expects a MenuItemData instance")
+    token = _new_token()
+    entry = {
+        "token": token,
+        "plugin": plugin,
+        "plugin_id": _plugin_id(plugin),
+        "item_id": getattr(item, "item_id", None) or token,
+        "menu_type": _menu_type_name(getattr(item, "menu_type", None)),
+        "text": getattr(item, "text", None),
+        "icon": getattr(item, "icon", None),
+        "subtext": getattr(item, "subtext", None),
+        "priority": int(getattr(item, "priority", 0) or 0),
+        "condition": getattr(item, "condition", None),
+        "on_click": getattr(item, "on_click", None),
+        "item": item,
+    }
+    _MENU_ITEMS.append(entry)
+    _MENU_ITEMS.sort(key=lambda menu_item: menu_item["priority"], reverse=True)
+    return token
+
+
+def unregister_menu_item(plugin, item_id):
+    """Remove a menu item registered by ``plugin``; accepts the token or the plugin item id."""
+    remaining = []
+    removed = False
+    for entry in _MENU_ITEMS:
+        same_plugin = entry["plugin"] is plugin
+        matches = entry["token"] == item_id or entry["item_id"] == item_id
+        if not matches and entry["item_id"] is not None:
+            matches = str(entry["item_id"]) == str(item_id)
+        if same_plugin and matches:
+            removed = True
+            continue
+        remaining.append(entry)
+    _MENU_ITEMS[:] = remaining
+    return removed
+
+
+def _menu_item_text(entry, context):
+    text = entry["text"]
+    if callable(text):
+        try:
+            return str(text(context))
+        except BaseException as error:
+            _fail_plugin(entry["plugin"], error)
+            return ""
+    return "" if text is None else str(text)
+
+
+def get_menu_items(menu_type, context=None):
+    """Return descriptors for every menu item of ``menu_type`` that applies right now."""
+    name = _menu_type_name(menu_type)
+    items = []
+    for entry in list(_MENU_ITEMS):
+        if entry["menu_type"] != name:
+            continue
+        condition = entry["condition"]
+        if callable(condition):
+            try:
+                if not condition(context):
+                    continue
+            except BaseException as error:
+                _fail_plugin(entry["plugin"], error)
+                continue
+        items.append({
+            "token": entry["token"],
+            "text": _menu_item_text(entry, context),
+            "icon": entry["icon"],
+            "subtext": entry["subtext"],
+            "plugin_id": entry["plugin_id"],
+            "menu_type": entry["menu_type"],
+        })
+    return items
+
+
+def trigger_menu_item(token, context=None):
+    """Invoke the click handler of a registered menu item."""
+    entry = None
+    for candidate in _MENU_ITEMS:
+        if str(candidate["token"]) == str(token):
+            entry = candidate
+            break
+    if entry is None:
+        return False
+    callback = entry["on_click"]
+    if not callable(callback):
+        return False
+    context = context if context is not None else {}
+    try:
+        try:
+            callback(context)
+        except TypeError:
+            callback()
+    except BaseException as error:
+        _fail_plugin(entry["plugin"], error)
+        raise
+    return True
 
 
 def _copy_java_object(target, source):
@@ -435,6 +544,7 @@ def load_plugin(plugin_id, plugin_path, settings_path):
             plugin.logger = _PluginLogger(plugin)
             plugin._registered_hooks = []
             plugin._registered_send_hook = False
+            plugin._registered_menu_items = []
             plugin.on_plugin_load()
             _PLUGINS[plugin_id] = {
                 "plugin": plugin,

@@ -7,8 +7,10 @@ It is intentionally not the full exteraGram API.
 import threading
 
 try:
+    from java import dynamic_proxy as _dynamic_proxy
     from java import jclass as _jclass
 except Exception as error:
+    _dynamic_proxy = None
     _jclass = None
     _JAVA_IMPORT_ERROR = error
 else:
@@ -109,3 +111,118 @@ def run_on_queue(func, queue=PLUGINS_QUEUE, delay=0):
     from android_utils import R
 
     return dispatch_queue.postRunnable(R(func), delay_ms)
+
+
+# --- account and controller accessors -------------------------------------
+
+def get_user_config():
+    """Return the ``UserConfig`` Java class (static access, as in exteraGram)."""
+    return _java_class("org.telegram.messenger.UserConfig")
+
+
+def _account_number(account=None):
+    if account is None:
+        return int(get_user_config().selectedAccount)
+    return int(account)
+
+
+def get_account_instance(account=None):
+    """Return ``AccountInstance`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.messenger.AccountInstance").getInstance(
+        _account_number(account)
+    )
+
+
+def get_messages_controller(account=None):
+    """Return ``MessagesController`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.messenger.MessagesController").getInstance(
+        _account_number(account)
+    )
+
+
+def get_connections_manager(account=None):
+    """Return ``ConnectionsManager`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.tgnet.ConnectionsManager").getInstance(
+        _account_number(account)
+    )
+
+
+def get_contacts_controller(account=None):
+    """Return ``ContactsController`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.messenger.ContactsController").getInstance(
+        _account_number(account)
+    )
+
+
+def get_notifications_controller(account=None):
+    """Return ``NotificationsController`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.messenger.NotificationsController").getInstance(
+        _account_number(account)
+    )
+
+
+def get_media_data_controller(account=None):
+    """Return ``MediaDataController`` for ``account`` or the currently selected account."""
+    return _java_class("org.telegram.messenger.MediaDataController").getInstance(
+        _account_number(account)
+    )
+
+
+# --- TL requests ----------------------------------------------------------
+
+if _dynamic_proxy is not None:
+    try:
+        _RequestDelegateInterface = _java_class("org.telegram.tgnet.RequestDelegate")
+
+        class _RequestDelegateProxy(_dynamic_proxy(_RequestDelegateInterface)):
+            def __init__(self, callback):
+                super().__init__()
+                self._callback = callback
+
+            def run(self, response, error):
+                self._callback(response, error)
+
+    except Exception as error:
+        _JAVA_IMPORT_ERROR = error
+        _RequestDelegateInterface = None
+        _RequestDelegateProxy = None
+else:
+    _RequestDelegateInterface = None
+    _RequestDelegateProxy = None
+
+
+def RequestCallback(callback):
+    """Wrap ``callback(response, error)`` into a ``RequestDelegate`` for ``sendRequest``."""
+    if not callable(callback):
+        raise TypeError("RequestCallback expects a callable")
+    if _RequestDelegateProxy is None:
+        raise RuntimeError(
+            "RequestCallback needs Chaquopy Java interface proxies in Irongram"
+        ) from _JAVA_IMPORT_ERROR
+    return _RequestDelegateProxy(callback)
+
+
+def send_request(request, callback=None, flags=0, account=None):
+    """Send a TL request through ``ConnectionsManager``; ``callback`` may be a Python callable."""
+    if request is None:
+        raise TypeError("send_request expects a TL request object")
+    manager = get_connections_manager(account)
+    delegate = callback
+    if callback is not None and not (_RequestDelegateInterface is not None
+                                     and isinstance(callback, _RequestDelegateInterface)):
+        delegate = RequestCallback(callback)
+    if delegate is None:
+        return manager.sendRequest(request)
+    return manager.sendRequest(request, delegate, int(flags))
+
+
+def send_message(message_data, account=None):
+    """Send a message described by a ``SendMessageParams`` or ``MessageObject``."""
+    if message_data is None:
+        raise TypeError("send_message expects a message or SendMessageParams object")
+    helper = get_send_messages_helper(account)
+    if isinstance(message_data, dict):
+        raise TypeError(
+            "send_message expects a SendMessageParams object, not a dictionary"
+        )
+    return helper.sendMessage(message_data)

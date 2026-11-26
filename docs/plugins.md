@@ -66,6 +66,34 @@ class ExampleRewriter(BasePlugin):
   Switch, selector, and text input values are stored through `BasePlugin.set_setting()` and
   `on_change` callbacks are invoked after saving. `Text.on_click` is invoked on tap, and
   `Text.create_sub_fragment` opens a nested settings page.
+- Plugin menu items: `add_menu_item(MenuItemData(menu_type=..., text=..., icon=..., on_click=...))`
+  accepts the exteraGram `MenuItemType` values (`CHAT_ACTION_MENU`, `MESSAGE_CONTEXT_MENU`,
+  `DRAWER_MENU`, `MAIN_MENU`, `PROFILE_ACTION_MENU`) and returns a token for
+  `remove_menu_item(token)`. The click handler receives a context dictionary (for example
+  `{"dialog_id": ...}`). Items are kept in sync with the plugin lifecycle and removed when the
+  plugin is unloaded or disabled. **The client UI does not render these items yet** — registration
+  succeeds so plugins load, but no menu entry is shown.
+- exteraGram helper modules bundled with the app:
+  - `hook_utils`: `find_class`, `find_method`, `get_private_field`, `set_private_field` (reflection
+    helpers) plus the `MethodHook` / `MethodReplacement` / `HookFilter` names re-exported from
+    `base_plugin`. `hook_method`, `unhook_method`, and `hook_all_methods` raise
+    `NotImplementedError`.
+  - `ui.alert.AlertDialogBuilder`: `set_title`, `set_message`, `set_view`, `set_items`,
+    `set_positive_button`, `set_negative_button`, `set_neutral_button`, `make_button_red`,
+    `create`, `show`; button callbacks receive `(dialog, which)`.
+  - `ui.bulletin.BulletinHelper`: `show_info`, `show_success`, `show_error`, `show_with_button`,
+    `show_copied_to_clipboard`.
+  - `file_utils`: `get_cache_dir`, `get_files_dir`, `get_external_files_dir`,
+    `get_external_cache_dir` (all return absolute paths as `str`).
+  - `markdown_utils`: `parse_markdown(text)` returning `ParsedMarkdown(text, entities)` where each
+    entity converts to a `TLRPC.TL_messageEntity*` object with `to_tlrpc_object()`; supports bold,
+    italic, underline, strike, spoiler, inline code, fenced code, `[text](url)` links, and `\`
+    escapes.
+  - `client_utils`: `get_send_messages_helper`, `get_file_loader`, `get_last_fragment`,
+    `get_user_config`, `get_account_instance`, `get_messages_controller`,
+    `get_connections_manager`, `get_contacts_controller`, `get_notifications_controller`,
+    `get_media_data_controller`, `get_queue_by_name`, `run_on_queue`, `send_request`,
+    `RequestCallback`, `send_message`.
 - `Custom` declarations (including existing `UItem`, Android `View`, and
   `SimpleSettingFactory` values) are shown as unsupported rows; custom Java/Android view factories
   are not executed. `EditText` supports multiline input and `max_length`; custom input masks and
@@ -77,20 +105,26 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
 - Arbitrary Xposed-style Java method hooking (`hook_method`, `MethodHook`, `MethodReplacement`) is
   not implemented. Calling `BasePlugin.hook_method` raises `NotImplementedError`.
+- Plugin menu items are registered but not displayed anywhere in the client yet (see above).
 - A narrow subset of `android_utils` is implemented in
   `TMessagesProj/src/main/python/android_utils.py`: `R`, click/long-click listener wrappers,
   UI-thread scheduling, basic legacy string logging, and clipboard copying. This is not full
   exteraGram utility compatibility.
-- The current `client_utils` subset provides `get_send_messages_helper`, `get_file_loader`,
-  `get_last_fragment`, and `run_on_queue`; `ui.bulletin.BulletinHelper` provides error and success
-  bulletins. Other client, dialog, bulletin, and reflection APIs are not implemented.
+- `client_utils`, `android_utils`, `ui.bulletin`, and `hook_utils` cover the members listed above
+  only. Anything else (for example `dialogs_utils`, `locale_utils`, `xposed_utils`,
+  `dex_utils`, or arbitrary Android helpers) is not bundled.
 - For the QR Generator sample, direct imports of `org.telegram.messenger.ApplicationLoader` and
   `org.telegram.ui.ActionBar.AlertDialog` are mapped to those Java classes. This is a narrow bridge,
   not general Java-package or method-hook compatibility; use `java.jclass` for other Java classes.
-- Plugin menu injection, custom Android-view settings factories, and application lifecycle events
+- Rendered plugin menus, custom Android-view settings factories, and application lifecycle events
   are not implemented. The supported built-in settings controls are a limited subset of the
   exteraGram settings API.
 - `.elyx` / `.eaf` structured plugin formats and app/SDK version constraints are not implemented.
+
+Host-side checks (`plugin_runtime.load_plugin` against a stubbed Chaquopy environment) currently load
+`0x11DFE/Auto-Forwarder-Plugin` (`auto_forwarder.py`), `mr-Vestr/plugins` (`plugin_creator.py`,
+`templates.py`), and `py-sato/Privacy-Cleaner` (`privacy_cleaner.py`). Those runs exercise imports,
+plugin construction, `create_settings()`, and menu registration only — not on-device behaviour.
 
 The compatibility boundary is also shown in the Plugins screen. Do not describe this build as
 fully compatible until these APIs are implemented and exercised on Android devices.
