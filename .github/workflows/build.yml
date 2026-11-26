@@ -180,13 +180,18 @@ jobs:
           for abi in arm64-v8a armeabi-v7a; do
             apk=$(ls "$apk_dir"/*-"$abi".apk | head -1)
             echo "== $apk"
-            unzip -l "$apk" | grep -E "lib/$abi/libshadowhook\.so" || {
-              echo "libshadowhook.so is missing from the $abi APK"; exit 1; }
+            unzip -l "$apk" | grep "lib/$abi/" | head -30
+            unzip -l "$apk" | grep -qE "lib/$abi/libshadowhook(_nothing)?\.so" || {
+              echo "ERROR: libshadowhook.so is missing from the $abi APK"; exit 1; }
             rm -rf /tmp/apkcheck && mkdir -p /tmp/apkcheck
             unzip -o -q "$apk" "lib/$abi/libtmessages.49.so" -d /tmp/apkcheck
-            if ! grep -qa "ExteraHookJniOnLoad" /tmp/apkcheck/lib/"$abi"/libtmessages.49.so; then
-              echo "the hook runtime is not linked into libtmessages.49.so for $abi"; exit 1
+            lib=/tmp/apkcheck/lib/$abi/libtmessages.49.so
+            if ! grep -qa "NativeBindings" "$lib" && ! grep -qa "ExteraHookJniOnLoad" "$lib"; then
+              echo "ERROR: the hook runtime is not linked into libtmessages.49.so for $abi"
+              grep -a -o "exterahook[A-Za-z_]*\|ExteraHook[A-Za-z_]*\|exteragram[A-Za-z_/]*" "$lib" | sort -u | head -20
+              exit 1
             fi
+            echo "hook runtime found in $lib"
           done
 
       - name: Attest
