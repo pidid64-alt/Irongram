@@ -14,7 +14,7 @@ subprojects {
             android {
                 compileSdkVersion 37
                 buildToolsVersion "37.0.0"
-                ndkVersion "27.3.13750724"
+                ndkVersion "29.0.14206865"
 
                 lint {
                     checkReleaseBuilds false

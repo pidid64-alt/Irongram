@@ -26,6 +26,7 @@ public final class PythonMethodReplacement extends XC_MethodReplacement {
 
     public PythonMethodReplacement(String pluginId, PyObject callback, int priority) {
         super(priority);
+        this.pluginId = pluginId;
         this.callback = callback;
     }
 
