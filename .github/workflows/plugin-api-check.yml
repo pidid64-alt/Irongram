@@ -1,0 +1,19 @@
+name: Plugin API check
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Show java
+        run: java -version && echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms" || true
