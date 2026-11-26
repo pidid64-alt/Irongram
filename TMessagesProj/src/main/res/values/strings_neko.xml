@@ -350,4 +350,25 @@
 
     <!-- Accessibility -->
     <string name="AccessibilitySettings">Accessibility settings</string>
+
+    <!-- Plugins -->
+    <string name="Plugins">Plugins</string>
+    <string name="PluginsInstalled">Installed plugins</string>
+    <string name="PluginsEmpty">No plugins installed yet.</string>
+    <string name="PluginsInstall">Install from file</string>
+    <string name="PluginsSafeMode">Safe mode</string>
+    <string name="PluginsSafeModeInfo">In safe mode plugins are not loaded on startup. Use it if a plugin prevents the app from starting.</string>
+    <string name="PluginsHint">A plugin is a .plugin file that contains plugin.json and classes.dex. Tap a plugin to enable or disable it, long press for more actions.</string>
+    <string name="PluginSettings">Plugin settings</string>
+    <string name="PluginReload">Reload</string>
+    <string name="PluginDeleteTitle">Delete plugin</string>
+    <string name="PluginDeleteText">Delete %1$s? Its settings and data will be removed.</string>
+    <string name="PluginInstalled">Plugin %1$s installed</string>
+    <string name="PluginError">Error: %1$s</string>
+    <string name="PluginLoading">Loading…</string>
+    <string name="PluginDisabled">Disabled</string>
+    <string name="PluginEnabled">Enabled</string>
+    <string name="PluginVersion">Version %1$s</string>
+    <string name="PluginAuthor">by %1$s</string>
+    <string name="PluginNoSettings">This plugin has no settings.</string>
 </resources>

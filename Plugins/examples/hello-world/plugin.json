@@ -1,0 +1,9 @@
+{
+  "id": "com.example.hello",
+  "name": "Hello world",
+  "entrypoint": "com.example.helloworld.HelloPlugin",
+  "version": "1.0",
+  "author": "Irongram",
+  "description": "Example plugin: appends a suffix to outgoing messages and shows its own settings screen.",
+  "apiVersion": 1
+}

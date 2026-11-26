@@ -77,3 +77,17 @@
 
 -dontwarn android.support.annotation.*
 -dontwarn androidx.compose.**
+
+# Irongram plugin system: the engine and the plugin API are referenced from external dex files,
+# so their names must not be obfuscated.
+-keep class tw.nekomimi.nekogram.plugins.** { *; }
+-keep class * extends tw.nekomimi.nekogram.plugins.BasePlugin { *; }
+-keep class tw.nekomimi.nekogram.plugins.settings.** { *; }
+
+# Plugin API touches these classes directly, keep the names stable across release builds.
+-keep class org.telegram.messenger.SendMessagesHelper$SendMessageParams { *; }
+-keepclassmembers class org.telegram.messenger.SendMessagesHelper$SendMessageParams { <fields>; }
+-keepclassmembers class org.telegram.messenger.NotificationCenter { public static final int *; }
+-keepnames class org.telegram.messenger.NotificationCenter
+-keepnames class org.telegram.messenger.BuildConfig
+-keepnames class org.telegram.ui.ActionBar.BaseFragment

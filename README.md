@@ -22,6 +22,23 @@ MTProto protocol manuals: https://core.telegram.org/mtproto
 1. Fill out values in `TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java` – there’s a link for each of the variables showing where and which data to obtain.
 1. You are ready to compile Nekogram.
 
+## Plugins
+
+Irongram has a built-in plugin engine. It is a port of the idea behind
+[exteraGram](https://github.com/exteraSquad/exteraGram) plugins: the same concepts (plugin archives
+with metadata, per-plugin preferences, declarative settings, hooks and a safe mode), but plugins are
+plain JVM bytecode that is loaded with a `DexClassLoader`, so no Python runtime or other external
+dependency is required.
+
+* A plugin is a `.plugin` archive that contains `plugin.json`, `classes.dex` and an optional `icon.png`.
+* Installed plugins are managed in **Neko Settings -> Plugins**: enable/disable, reload, delete,
+  safe mode and "install from file".
+* Plugins run inside the app process and can use the client API directly, so install only plugins
+  you trust.
+
+Read [Plugins/README.md](Plugins/README.md) for the archive format and the API, and check
+[Plugins/examples/hello-world](Plugins/examples/hello-world) for a complete, buildable example.
+
 ## Localization
 
 Nekogram is forked from Telegram, thus most locales follows the translations of Telegram for Android, checkout https://translations.telegram.org/en/android/.

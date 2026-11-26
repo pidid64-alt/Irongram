@@ -46,6 +46,7 @@ import tw.nekomimi.nekogram.accessibility.AccessibilitySettingsActivity;
 import tw.nekomimi.nekogram.helpers.CloudSettingsHelper;
 import tw.nekomimi.nekogram.helpers.PasscodeHelper;
 import tw.nekomimi.nekogram.helpers.remote.ConfigHelper;
+import tw.nekomimi.nekogram.plugins.ui.PluginsActivity;
 
 public class NekoSettingsActivity extends BaseNekoSettingsActivity implements FactorAnimator.Target {
 
@@ -62,6 +63,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
     private final int passcodeRow = rowId++;
     private final int experimentRow = rowId++;
     private final int accessibilityRow = rowId++;
+    private final int pluginsRow = rowId++;
 
     private final int channelRow = rowId++;
     private final int websiteRow = rowId++;
@@ -172,6 +174,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         if (am != null && am.isTouchExplorationEnabled()) {
             items.add(UItem.asButton(accessibilityRow, LocaleController.getString(R.string.AccessibilitySettings)).slug("accessibility"));
         }
+        items.add(UItem.asButton(pluginsRow, R.drawable.msg_settings, LocaleController.getString(R.string.Plugins)).slug("plugins"));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asButton(channelRow, R.drawable.msg_channel, LocaleController.getString(R.string.OfficialChannel), "@" + LocaleController.getString(R.string.OfficialChannelUsername)).slug("channel"));
@@ -213,6 +216,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             presentFragment(new NekoExperimentalSettingsActivity());
         } else if (id == accessibilityRow) {
             presentFragment(new AccessibilitySettingsActivity());
+        } else if (id == pluginsRow) {
+            presentFragment(new PluginsActivity());
         } else if (id == channelRow) {
             getMessagesController().openByUserName(LocaleController.getString(R.string.OfficialChannelUsername), this, 1);
         } else if (id == donateRow) {
@@ -327,6 +332,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         searchResultList.add(new SearchResult(20002, LocaleController.getString(R.string.ViewSourceCode), "GitHub", R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://github.com/Nekogram/Nekogram")));
         searchResultList.add(new SearchResult(20003, LocaleController.getString(R.string.Translation), LocaleController.getString(R.string.TranslationAbout), R.drawable.msg2_help, () -> Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram")));
         searchResultList.add(new SearchResult(20004, LocaleController.getString(R.string.Donate), LocaleController.getString(R.string.DonateAbout), R.drawable.msg2_help, () -> presentFragment(new NekoDonateActivity())));
+        searchResultList.add(new SearchResult(20005, LocaleController.getString(R.string.Plugins), R.drawable.msg_settings, () -> presentFragment(new PluginsActivity())));
 
         return searchResultList;
     }
