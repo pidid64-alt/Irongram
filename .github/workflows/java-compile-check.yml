@@ -44,6 +44,11 @@ jobs:
         with:
           packages: 'build-tools;37.0.0 platforms;android-37.0'
 
+      - name: Configure Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          printf 'org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\norg.gradle.parallel=true\n' >> ~/.gradle/gradle.properties
+
       - name: Configure API placeholders
         run: |
           printf 'apiId=1\napiHash=0123456789abcdef0123456789abcdef\nmapsApiKey=placeholder\nhelperBotId=1\nhelperBotUsername=placeholder\n' >> local.properties
