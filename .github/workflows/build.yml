@@ -172,6 +172,23 @@ jobs:
         if: failure()
         run: python3 tools/ci/report_gradle_errors.py gradle-build.log
 
+      # The ART hook runtime is only linked on ARM, so its packaging has to be verified per APK.
+      - name: Check the hook runtime was packaged
+        run: |
+          set -euo pipefail
+          apk_dir=TMessagesProj_App/build/outputs/apk/release
+          for abi in arm64-v8a armeabi-v7a; do
+            apk=$(ls "$apk_dir"/*-"$abi".apk | head -1)
+            echo "== $apk"
+            unzip -l "$apk" | grep -E "lib/$abi/libshadowhook\.so" || {
+              echo "libshadowhook.so is missing from the $abi APK"; exit 1; }
+            rm -rf /tmp/apkcheck && mkdir -p /tmp/apkcheck
+            unzip -o -q "$apk" "lib/$abi/libtmessages.49.so" -d /tmp/apkcheck
+            if ! grep -qa "ExteraHookJniOnLoad" /tmp/apkcheck/lib/"$abi"/libtmessages.49.so; then
+              echo "the hook runtime is not linked into libtmessages.49.so for $abi"; exit 1
+            fi
+          done
+
       - name: Attest
         uses: actions/attest@v4
         with:

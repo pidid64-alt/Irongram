@@ -164,7 +164,10 @@ plugin is inactive.
 
 Under the hood this uses exteraHook — the same ART hook runtime exteraGram ships: `hook-core`
 (the `de.robv.android.xposed` compatibility layer) plus its LSPlant fork, both vendored in
-`Tools/maven` and linked into `libtmessages.49.so`. Two consequences:
+`Tools/maven` and linked into `libtmessages.49.so` together with ByteDance's shadowhook. Licensing
+of the vendored pieces: `hook-core` and its additional terms are GPLv3-or-later
+(`TMessagesProj/src/main/python/EXTERAGRAM_TERMS.md`), LSPlant is LGPL-3.0 and shadowhook is
+Apache-2.0. Two consequences:
 
 - Hooking is available on **arm64-v8a and armeabi-v7a** only; the vendored runtime ships no x86
   native libraries, so on x86/x86_64 the client still runs but `hook_method` reports that hooking
