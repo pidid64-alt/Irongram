@@ -16,6 +16,9 @@ _ERRORS = []
 _NEXT_TOKEN = 1
 _NEXT_SETTINGS_PAGE = 1
 _PYTHON_LIBRARY_DIRECTORY = None
+# Context made available to BasePlugin.__init__ so plugins may read and write settings from
+# their own constructor, which several real exteraGram plugins do.
+_LOAD_CONTEXT = {}
 _MAX_AUTO_INSTALLED_IMPORTS = 8
 _JAVA_IMPORT_ROOTS = frozenset({
     "android", "androidx", "com", "dalvik", "java", "javax", "kotlin", "org", "sun"
@@ -553,7 +556,16 @@ def load_plugin(plugin_id, plugin_path, settings_path):
             if len(classes) != 1:
                 raise TypeError("Plugin file must define exactly one BasePlugin subclass")
 
-            plugin = classes[0]()
+            _LOAD_CONTEXT.clear()
+            _LOAD_CONTEXT.update({
+                "plugin_id": plugin_id,
+                "plugin_path": plugin_path,
+                "settings_path": os.path.abspath(str(settings_path)),
+            })
+            try:
+                plugin = classes[0]()
+            finally:
+                _LOAD_CONTEXT.clear()
             plugin._plugin_id = plugin_id
             plugin._plugin_path = plugin_path
             plugin._settings_path = os.path.abspath(str(settings_path))

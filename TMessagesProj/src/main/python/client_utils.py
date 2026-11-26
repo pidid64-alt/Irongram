@@ -216,13 +216,89 @@ def send_request(request, callback=None, flags=0, account=None):
     return manager.sendRequest(request, delegate, int(flags))
 
 
+def _send_params_class():
+    return _java_class("org.telegram.messenger.SendMessagesHelper$SendMessageParams")
+
+
+def _java_list(values):
+    array_list = _java_class("java.util.ArrayList")()
+    for value in values or []:
+        array_list.add(value)
+    return array_list
+
+
+def _peer_from(message_data):
+    for key in ("peer", "dialog_id", "to_peer", "chat_id", "user_id"):
+        value = message_data.get(key)
+        if value is not None:
+            return int(value)
+    raise ValueError("send_message requires a 'peer' entry")
+
+
 def send_message(message_data, account=None):
-    """Send a message described by a ``SendMessageParams`` or ``MessageObject``."""
+    """Send a message described by a dictionary, as exteraGram plugins expect.
+
+    Supported keys: ``peer`` (required, dialog id), ``message``, ``caption``,
+    ``path`` (attach a file), ``entities``, ``replyToMsg``, ``replyToTopMsg``,
+    ``searchLinks``, ``silent``, and ``webPage``.
+    """
     if message_data is None:
-        raise TypeError("send_message expects a message or SendMessageParams object")
+        raise TypeError("send_message expects a SendMessagesHelperParams or a dictionary")
     helper = get_send_messages_helper(account)
-    if isinstance(message_data, dict):
-        raise TypeError(
-            "send_message expects a SendMessageParams object, not a dictionary"
-        )
-    return helper.sendMessage(message_data)
+    if not isinstance(message_data, dict):
+        return helper.sendMessage(message_data)
+
+    params = _send_params_class()()
+    params.peer = _peer_from(message_data)
+    message = message_data.get("message")
+    if message is not None:
+        params.message = str(message)
+    caption = message_data.get("caption")
+    if caption is not None:
+        params.caption = str(caption)
+    path = message_data.get("path") or message_data.get("document_path")
+    if path:
+        params.path = str(path)
+    entities = message_data.get("entities")
+    if entities:
+        params.entities = _java_list(entities)
+    reply = message_data.get("replyToMsg", message_data.get("reply_to_msg"))
+    if reply is not None:
+        params.replyToMsg = reply
+    reply_top = message_data.get("replyToTopMsg", message_data.get("reply_to_top_msg"))
+    if reply_top is not None:
+        params.replyToTopMsg = reply_top
+    if "searchLinks" in message_data:
+        params.searchLinks = bool(message_data["searchLinks"])
+    elif "search_links" in message_data:
+        params.searchLinks = bool(message_data["search_links"])
+    web_page = message_data.get("webPage")
+    if web_page is not None:
+        params.webPage = web_page
+    params.notify = not bool(message_data.get("silent", False))
+    return helper.sendMessage(params)
+
+
+def send_document(peer, path, caption=None, entities=None, account=None, notify=True):
+    """Send the file at ``path`` as a document to ``peer``."""
+    helper_class = _java_class("org.telegram.messenger.SendMessagesHelper")
+    helper_class.prepareSendingDocument(
+        get_account_instance(account),
+        str(path),
+        None,
+        None,
+        None if caption is None else str(caption),
+        None,
+        int(peer),
+        None,
+        None,
+        None,
+        None,
+        None,
+        bool(notify),
+        0,
+        None,
+        None,
+        False
+    )
+    return True

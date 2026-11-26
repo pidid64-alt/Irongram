@@ -4,16 +4,32 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'TMessagesProj/src/main/python/**'
       - 'TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/**'
+      - 'TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java'
+      - 'tools/plugin_sdk_check/**'
+      - '.github/workflows/plugin-api-check.yml'
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+
+      - uses: actions/setup-python@v5
         with:
-          distribution: temurin
-          java-version: '21'
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip packaging
+
+      - name: Check the bundled plugin SDK
+        run: python tools/plugin_sdk_check/check_sdk.py
+
+      - name: Load real exteraGram plugins
+        run: |
+          python tools/plugin_sdk_check/check_sdk.py \
+            --plugin-url https://raw.githubusercontent.com/0x11DFE/Auto-Forwarder-Plugin/v1.9.0/auto_forwarder.py
+
       - name: Show java
-        run: java -version && echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms" || true
+        run: java -version || true

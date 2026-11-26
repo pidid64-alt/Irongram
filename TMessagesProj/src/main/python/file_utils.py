@@ -4,6 +4,8 @@ The helpers return absolute paths as plain ``str`` values, so plugins can use th
 with ``os.path.join`` and other standard library calls.
 """
 
+import os
+
 try:
     from java import jclass as _jclass
 except Exception as _error:
@@ -73,3 +75,34 @@ def get_external_cache_dir():
     if external is None:
         return get_cache_dir()
     return _absolute_path(external)
+
+
+def get_plugins_dir():
+    """Return the directory where Irongram stores installed plugin files."""
+    directory = _java_class("java.io.File")(get_files_dir(), "irongram/plugins")
+    if not directory.exists():
+        directory.mkdirs()
+    return _absolute_path(directory)
+
+
+def read_file(path):
+    """Return the contents of ``path`` as text, or an empty string on failure."""
+    try:
+        with open(str(path), "r", encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    except Exception:
+        return ""
+
+
+def write_file(path, data, append=False):
+    """Write ``data`` to ``path`` (creating parent directories) and return True on success."""
+    try:
+        target = str(path)
+        parent = os.path.dirname(target)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(target, "a" if append else "w", encoding="utf-8") as handle:
+            handle.write(data if isinstance(data, str) else str(data))
+        return True
+    except Exception:
+        return False

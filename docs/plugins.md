@@ -43,7 +43,8 @@ class ExampleRewriter(BasePlugin):
 
 - Install, enable, disable, remove, and restore enabled `.py` plugins at app startup.
 - `on_plugin_load` / `on_plugin_unload`, per-plugin JSON settings (`get_setting`, `set_setting`,
-  `export_settings`, `import_settings`), and Logcat logger methods.
+  `export_settings`, `import_settings`), and Logcat logger methods. Settings are already readable
+  and writable inside a plugin's `__init__`, which several real plugins rely on.
 - Event hooks registered by `add_hook(name, match_substring=False, priority=0)`:
   - `pre_request_hook` and `post_request_hook` for Telegram RPC request classes.
   - `on_update_hook` for individual update classes and `on_updates_hook` for update containers.
@@ -88,7 +89,8 @@ class ExampleRewriter(BasePlugin):
   - `ui.bulletin.BulletinHelper`: `show_info`, `show_success`, `show_error`, `show_with_button`,
     `show_copied_to_clipboard`.
   - `file_utils`: `get_cache_dir`, `get_files_dir`, `get_external_files_dir`,
-    `get_external_cache_dir` (all return absolute paths as `str`).
+    `get_external_cache_dir`, `get_plugins_dir` (all return absolute paths as `str`) plus
+    `read_file(path)` and `write_file(path, data, append=False)`.
   - `markdown_utils`: `parse_markdown(text)` returning `ParsedMarkdown(text, entities)` where each
     entity converts to a `TLRPC.TL_messageEntity*` object with `to_tlrpc_object()`; supports bold,
     italic, underline, strike, spoiler, inline code, fenced code, `[text](url)` links, and `\`
@@ -97,7 +99,10 @@ class ExampleRewriter(BasePlugin):
     `get_user_config`, `get_account_instance`, `get_messages_controller`,
     `get_connections_manager`, `get_contacts_controller`, `get_notifications_controller`,
     `get_media_data_controller`, `get_queue_by_name`, `run_on_queue`, `send_request`,
-    `RequestCallback`, `send_message`.
+    `RequestCallback`, `send_message`, `send_document`. `send_message` accepts a dictionary with
+    `peer` (required), `message`, `caption`, `path`, `entities`, `replyToMsg`, `replyToTopMsg`,
+    `searchLinks`, `silent`, and `webPage`; `send_document(peer, path, caption=None)` uploads a
+    file as a document. Sends still pass through `on_send_message_hook`.
 - `Custom` declarations (including existing `UItem`, Android `View`, and
   `SimpleSettingFactory` values) are shown as unsupported rows; custom Java/Android view factories
   are not executed. `EditText` supports multiline input and `max_length`; custom input masks and
@@ -126,10 +131,15 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
   exteraGram settings API.
 - `.elyx` / `.eaf` structured plugin formats and app/SDK version constraints are not implemented.
 
-Host-side checks (`plugin_runtime.load_plugin` against a stubbed Chaquopy environment) currently load
+`python tools/plugin_sdk_check/check_sdk.py --plugin-path <file>` loads a plugin through
+`plugin_runtime.load_plugin` against a stubbed Chaquopy environment (`tools/plugin_sdk_check/`); the
+`Plugin API check` workflow runs it on every change to the SDK. It currently loads
 `0x11DFE/Auto-Forwarder-Plugin` (`auto_forwarder.py`), `mr-Vestr/plugins` (`plugin_creator.py`,
-`templates.py`), and `py-sato/Privacy-Cleaner` (`privacy_cleaner.py`). Those runs exercise imports,
-plugin construction, `create_settings()`, and menu registration only — not on-device behaviour.
+`templates.py`, `ADB Lite/adb_lite.plugin`), `py-sato/Privacy-Cleaner` (`privacy_cleaner.py`), and
+`Th3Nekit/Th3ProxyTools` (`Th3ProxyTools.plugin`). Those runs exercise imports, plugin construction,
+`create_settings()`, and menu registration only — not on-device behaviour. Whole-client mods such as
+`nonFeature/LiteGram` and `repinek/LegacyGram` are not compatible: they are Python packages that
+expect Java method hooking (`hook_method`) and their own DEX utilities.
 
 The compatibility boundary is also shown in the Plugins screen. Do not describe this build as
 fully compatible until these APIs are implemented and exercised on Android devices.

@@ -6,6 +6,7 @@ full process privileges and should only be installed from a source the user trus
 
 import json
 import os
+import sys
 import tempfile
 import traceback
 from enum import Enum
@@ -121,6 +122,23 @@ class BasePlugin:
         self._registered_hooks = []
         self._registered_send_hook = False
         self._registered_menu_items = []
+        self._apply_load_context()
+
+    def _apply_load_context(self):
+        """Adopt plugin identity/settings paths while the runtime constructs this plugin.
+
+        Plugins commonly read settings in their ``__init__``, before the runtime had a chance to
+        assign these values, so the runtime publishes them before instantiating the class.
+        """
+        runtime = sys.modules.get("plugin_runtime")
+        context = getattr(runtime, "_LOAD_CONTEXT", None)
+        if not context:
+            return
+        self._plugin_id = context.get("plugin_id")
+        self._plugin_path = context.get("plugin_path")
+        self._settings_path = context.get("settings_path")
+        self._runtime = runtime
+        self.logger = _PluginLogger(self)
 
     def on_plugin_load(self):
         pass
