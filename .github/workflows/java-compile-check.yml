@@ -76,7 +76,7 @@ jobs:
       - name: Build debug APKs
         run: |
           set +e
-          ./gradlew :TMessagesProj:buildPythonSdkRelease :TMessagesProj:compileReleaseJavaWithJavac :TMessagesProj_App:compileReleaseJavaWithJavac :TMessagesProj_App:assembleArm64Debug --console=plain > gradle-compile.log 2>&1
+          ./gradlew :TMessagesProj:buildPythonSdkRelease :TMessagesProj:compileReleaseJavaWithJavac :TMessagesProj_App:compileReleaseJavaWithJavac :TMessagesProj_App:assembleArm64V8aDebug --console=plain > gradle-compile.log 2>&1
           result=$?
           if [ "$result" -ne 0 ]; then
             python tools/ci/report_gradle_errors.py gradle-compile.log
