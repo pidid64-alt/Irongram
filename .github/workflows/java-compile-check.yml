@@ -45,4 +45,12 @@ jobs:
           printf 'apiId=1\napiHash=0123456789abcdef0123456789abcdef\n' >> local.properties
 
       - name: Compile Android sources
-        run: ./gradlew :TMessagesProj:compileReleaseJavaWithJavac --console=plain
+        run: |
+          set +e
+          ./gradlew :TMessagesProj:compileReleaseJavaWithJavac :TMessagesProj_App:compileReleaseJavaWithJavac --console=plain > gradle-compile.log 2>&1
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            python tools/ci/report_gradle_errors.py gradle-compile.log
+            exit "$result"
+          fi
+          cat gradle-compile.log
