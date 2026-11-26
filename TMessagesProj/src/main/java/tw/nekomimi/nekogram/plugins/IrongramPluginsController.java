@@ -1032,7 +1032,8 @@ public final class IrongramPluginsController {
      * Python source and are treated identically.
      */
     public static boolean isPluginFile(String fileName) {
-        if (fileName == null) {
+        if (fileName == null || fileName.startsWith(".")) {
+            // Dot files are in-flight imports or editor swap files, never installed plugins.
             return false;
         }
         String lowerCase = fileName.toLowerCase(Locale.ROOT);
