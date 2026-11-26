@@ -88,6 +88,9 @@ android {
         minSdkVersion 24
         versionName APP_VERSION_NAME
 
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
         multiDexEnabled true
 
         manifestPlaceholders = [MAPS_API_KEY: localProperties.get("mapsApiKey")]
