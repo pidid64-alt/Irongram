@@ -159,13 +159,18 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          ./gradlew assembleRelease
-          ./gradlew bundlePlay
+          set -o pipefail
+          ./gradlew assembleRelease --console=plain 2>&1 | tee gradle-build.log
+          ./gradlew bundlePlay --console=plain 2>&1 | tee -a gradle-build.log
           if [ -s sentry.properties ]; then
-            ./gradlew sentryUploadSourceBundlePlay
+            ./gradlew sentryUploadSourceBundlePlay --console=plain 2>&1 | tee -a gradle-build.log
           else
             echo "Skipping Sentry source upload because SENTRY_PROPERTIES is not configured."
           fi
+
+      - name: Report Gradle errors
+        if: failure()
+        run: python3 tools/ci/report_gradle_errors.py gradle-build.log
 
       - name: Attest
         uses: actions/attest@v4
