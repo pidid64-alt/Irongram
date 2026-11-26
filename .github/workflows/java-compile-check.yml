@@ -46,7 +46,7 @@ jobs:
 
       - name: Configure API placeholders
         run: |
-          printf 'apiId=1\napiHash=0123456789abcdef0123456789abcdef\n' >> local.properties
+          printf 'apiId=1\napiHash=0123456789abcdef0123456789abcdef\nmapsApiKey=placeholder\nhelperBotId=1\nhelperBotUsername=placeholder\n' >> local.properties
 
       - name: Compile Android sources
         run: |
