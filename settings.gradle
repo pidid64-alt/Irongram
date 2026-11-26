@@ -20,11 +20,10 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google()
-        mavenCentral()
-        // Vendored artifacts: exteraHook's Xposed compatibility layer (hook-core) and its LSPlant
-        // fork (lsplant). See TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/hooks/
-        // and docs/plugins.md.
+        // Vendored artifacts first: exteraHook's Xposed compatibility layer (hook-core), its LSPlant
+        // fork and its shadowhook copy. They are listed before Maven Central so the ARM-only native
+        // packages we patch for the other ABIs win over the upstream artifacts. See
+        // TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/hooks/ and docs/plugins.md.
         maven {
             url = uri("./Tools/maven")
             content {
@@ -33,6 +32,8 @@ dependencyResolutionManagement {
                 includeGroup("com.bytedance.android")
             }
         }
+        google()
+        mavenCentral()
     }
 }
 
