@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [ "dev", "ci", "arena/964e9a23-irongram" ]
+    branches: [ "dev", "ci", "arena/**" ]
     paths-ignore:
       - '**.md'
       - '.github/**'

@@ -68,6 +68,22 @@ def unregister_plugin_hooks(plugin):
     _MENU_ITEMS[:] = [item for item in _MENU_ITEMS if item["plugin"] is not plugin]
 
 
+def _menu_context(context):
+    """Convert a Java map passed from the client into a plain Python dictionary."""
+    if context is None:
+        return {}
+    if isinstance(context, dict):
+        return context
+    try:
+        return {str(key): context.get(key) for key in context.keySet()}
+    except Exception:
+        pass
+    try:
+        return {str(key): value for key, value in context.items()}
+    except Exception:
+        return {}
+
+
 def _menu_type_name(menu_type):
     value = getattr(menu_type, "value", menu_type)
     return str(value)
@@ -128,6 +144,7 @@ def _menu_item_text(entry, context):
 def get_menu_items(menu_type, context=None):
     """Return descriptors for every menu item of ``menu_type`` that applies right now."""
     name = _menu_type_name(menu_type)
+    context = _menu_context(context)
     items = []
     for entry in list(_MENU_ITEMS):
         if entry["menu_type"] != name:
@@ -163,7 +180,7 @@ def trigger_menu_item(token, context=None):
     callback = entry["on_click"]
     if not callable(callback):
         return False
-    context = context if context is not None else {}
+    context = _menu_context(context)
     try:
         try:
             callback(context)

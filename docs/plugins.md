@@ -71,8 +71,12 @@ class ExampleRewriter(BasePlugin):
   `DRAWER_MENU`, `MAIN_MENU`, `PROFILE_ACTION_MENU`) and returns a token for
   `remove_menu_item(token)`. The click handler receives a context dictionary (for example
   `{"dialog_id": ...}`). Items are kept in sync with the plugin lifecycle and removed when the
-  plugin is unloaded or disabled. **The client UI does not render these items yet** — registration
-  succeeds so plugins load, but no menu entry is shown.
+  plugin is unloaded or disabled. `CHAT_ACTION_MENU` entries are appended to the chat three-dot
+  menu (icons are resolved by drawable name, falling back to `msg_list`); the click handler receives
+  `{"dialog_id": ..., "account": ..., "user_id"|"chat_id": ...}`. Menu entries are added when the
+  chat screen is created, so a newly registered item shows up after reopening the chat.
+  `MESSAGE_CONTEXT_MENU`, `DRAWER_MENU`, `MAIN_MENU`, and `PROFILE_ACTION_MENU` entries are
+  registered but not rendered yet.
 - exteraGram helper modules bundled with the app:
   - `hook_utils`: `find_class`, `find_method`, `get_private_field`, `set_private_field` (reflection
     helpers) plus the `MethodHook` / `MethodReplacement` / `HookFilter` names re-exported from
@@ -105,7 +109,8 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
 - Arbitrary Xposed-style Java method hooking (`hook_method`, `MethodHook`, `MethodReplacement`) is
   not implemented. Calling `BasePlugin.hook_method` raises `NotImplementedError`.
-- Plugin menu items are registered but not displayed anywhere in the client yet (see above).
+- Only the chat three-dot menu renders plugin entries; message context menus, the drawer, and the
+  profile menu do not show plugin entries yet.
 - A narrow subset of `android_utils` is implemented in
   `TMessagesProj/src/main/python/android_utils.py`: `R`, click/long-click listener wrappers,
   UI-thread scheduling, basic legacy string logging, and clipboard copying. This is not full

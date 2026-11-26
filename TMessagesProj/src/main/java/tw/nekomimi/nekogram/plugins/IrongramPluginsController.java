@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -813,6 +814,77 @@ public final class IrongramPluginsController {
             loadedPluginCount = Math.max(0, loadedPluginCount - 1);
         }
         collectRuntimeErrorsLocked();
+    }
+
+    /** A menu entry registered by a Python plugin through ``BasePlugin.add_menu_item``. */
+    public static final class PluginMenuItem {
+        public final int token;
+        public final String text;
+        public final String icon;
+
+        PluginMenuItem(int token, String text, String icon) {
+            this.token = token;
+            this.text = text;
+            this.icon = icon;
+        }
+    }
+
+    /**
+     * Menu entries of ``menuType`` that apply to the current screen.
+     *
+     * <p>The Python runtime decides which items match, using the optional item condition and the
+     * supplied context. This never starts Python: when no plugin has been loaded yet the list is
+     * simply empty.</p>
+     */
+    public ArrayList<PluginMenuItem> getMenuItems(String menuType, HashMap<String, Object> context) {
+        ArrayList<PluginMenuItem> items = new ArrayList<>();
+        if (!pluginSystemEnabled || loadedPluginCount == 0) {
+            return items;
+        }
+        synchronized (pythonLock) {
+            if (runtime == null) {
+                return items;
+            }
+            try {
+                List<PyObject> descriptors = ensureRuntimeLocked()
+                        .callAttr("get_menu_items", menuType, context)
+                        .asList();
+                for (PyObject descriptor : descriptors) {
+                    int token = readIntAttribute(descriptor, "token", -1);
+                    PyObject text = descriptor.get("text");
+                    PyObject icon = descriptor.get("icon");
+                    if (token < 0 || text == null) {
+                        continue;
+                    }
+                    items.add(new PluginMenuItem(
+                            token,
+                            text.toString(),
+                            icon == null || icon.isNone() ? null : icon.toString()
+                    ));
+                }
+            } catch (Throwable error) {
+                FileLog.e(error);
+            }
+        }
+        return items;
+    }
+
+    /** Invoke the click handler of a plugin menu entry registered by :meth:`add_menu_item`. */
+    public void triggerMenuItem(int token, HashMap<String, Object> context) {
+        if (!pluginSystemEnabled || runtime == null) {
+            return;
+        }
+        synchronized (pythonLock) {
+            if (runtime == null) {
+                return;
+            }
+            try {
+                ensureRuntimeLocked().callAttr("trigger_menu_item", token, context);
+                collectRuntimeErrorsLocked();
+            } catch (Throwable error) {
+                FileLog.e(error);
+            }
+        }
     }
 
     private void collectRuntimeErrorsLocked() {
