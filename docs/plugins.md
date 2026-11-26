@@ -1,7 +1,8 @@
 # Irongram Python plugins (compatibility layer in progress)
 
 Irongram can import a single Python plugin from Settings → Plugins, either as `.py` or as the
-exteraGram-style `.plugin` file. Tapping a `.plugin` attachment in a chat opens a metadata preview
+exteraGram-style `.plugin` file, and files copied by hand into the plugins directory are listed
+under either extension. Tapping a `.plugin` attachment in a chat opens a metadata preview
 and an install action. These are plain Python source files with a different extension, not `.elyx`
 archives. Imported files start **disabled**. Enabling a plugin executes its Python code inside the
 Irongram process; install only code and dependencies you trust. Plugins are not sandboxed.

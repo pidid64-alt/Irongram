@@ -23,9 +23,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -163,7 +165,7 @@ public final class IrongramPluginsController {
     }
 
     public List<InstalledPlugin> getInstalledPlugins() {
-        File[] files = getPluginsDirectory().listFiles((directory, name) -> name.endsWith(".py"));
+        File[] files = getPluginsDirectory().listFiles((directory, name) -> isPluginFile(name));
         ArrayList<InstalledPlugin> result = new ArrayList<>();
         if (files == null) {
             return result;
@@ -173,7 +175,7 @@ public final class IrongramPluginsController {
             try {
                 String source = readFile(file);
                 PluginMetadata metadata = PluginMetadata.fromSource(source);
-                if (!file.getName().equals(metadata.id + ".py")) {
+                if (!isPluginFileFor(file.getName(), metadata.id)) {
                     continue;
                 }
                 result.add(new InstalledPlugin(
@@ -182,7 +184,18 @@ public final class IrongramPluginsController {
                         preferences.getString(ERROR_PREFIX + metadata.id, null)
                 ));
             } catch (Exception error) {
-                FileLog.e("Ignoring invalid plugin file " + file.getName() + ": " + error.getMessage());
+                // The listings must not depend on the regex parser understanding every file: a
+                // hand-copied .plugin with unusual syntax still has to show up, and enabling it
+                // reports the real error through the Python parser.
+                FileLog.e("Falling back to the file name for " + file.getName() + ": " + error.getMessage());
+                String fileName = file.getName();
+                String fallbackId = fileName.substring(0, fileName.lastIndexOf('.'));
+                result.add(new InstalledPlugin(
+                        new PluginMetadata(fallbackId, fallbackId, "1.0", "", "", "",
+                                Collections.emptyList(), "", ""),
+                        preferences.getBoolean(ENABLED_PREFIX + fallbackId, false),
+                        preferences.getString(ERROR_PREFIX + fallbackId, null)
+                ));
             }
         }
         return result;
@@ -1005,7 +1018,31 @@ public final class IrongramPluginsController {
     }
 
     private File pluginFile(String pluginId) {
-        return new File(getPluginsDirectory(), pluginId + ".py");
+        File directory = getPluginsDirectory();
+        File legacy = new File(directory, pluginId + ".py");
+        if (legacy.isFile()) {
+            return legacy;
+        }
+        File plugin = new File(directory, pluginId + ".plugin");
+        return plugin.isFile() ? plugin : legacy;
+    }
+
+    /**
+     * exteraGram plugins may be stored either as {@code .py} or as {@code .plugin}; both are plain
+     * Python source and are treated identically.
+     */
+    public static boolean isPluginFile(String fileName) {
+        if (fileName == null) {
+            return false;
+        }
+        String lowerCase = fileName.toLowerCase(Locale.ROOT);
+        return lowerCase.endsWith(".py") || lowerCase.endsWith(".plugin");
+    }
+
+    private static boolean isPluginFileFor(String fileName, String pluginId) {
+        String lowerCase = fileName.toLowerCase(Locale.ROOT);
+        return lowerCase.equals(pluginId.toLowerCase(Locale.ROOT) + ".py")
+                || lowerCase.equals(pluginId.toLowerCase(Locale.ROOT) + ".plugin");
     }
 
     private File pluginSettingsFile(String pluginId) {
