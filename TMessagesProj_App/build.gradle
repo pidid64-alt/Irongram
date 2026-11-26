@@ -4,6 +4,7 @@ plugins {
     id 'com.android.application'
     id 'androidx.baselineprofile'
     id 'org.telegram.build-app-plugin'
+    id 'com.chaquo.python'
     id 'com.google.gms.google-services'
     id 'io.sentry.android.gradle'
 }
@@ -89,6 +90,21 @@ android {
         multiDexEnabled true
 
         manifestPlaceholders = [MAPS_API_KEY: localProperties.get("mapsApiKey")]
+
+        def configuredBuildPython = localProperties.getProperty("python.build") ?: System.getenv("BUILD_PYTHON")
+        python {
+            version = "3.11"
+            buildPython = configuredBuildPython ?: (org.gradle.internal.os.OperatingSystem.current().windows ? ["py", "-3.11"] : ["python3.11"])
+            pip {
+                install("beautifulsoup4")
+                install("debugpy")
+                install("lxml")
+                install("packaging")
+                install("pillow")
+                install("requests")
+                install("PyYAML")
+            }
+        }
     }
 
     splits.abi {

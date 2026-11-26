@@ -1,6 +1,60 @@
 import org.gradle.internal.os.OperatingSystem
 
 import java.nio.file.Paths
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.DefaultTask
+
+abstract class PythonSdkBuildTask extends DefaultTask {
+    @Inject
+    abstract ExecOperations getExecOperations()
+
+    @Input
+    abstract ListProperty<String> getPythonCommand()
+
+    @Input
+    abstract Property<String> getPythonVersion()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getBuildScript()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ConfigurableFileCollection getSources()
+
+    @Input
+    abstract Property<String> getChannel()
+
+    @Input
+    abstract ListProperty<String> getAbis()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+
+    @TaskAction
+    void buildSdk() {
+        def command = pythonCommand.get() + [
+                buildScript.get().asFile.absolutePath,
+                "--out", outputDirectory.get().asFile.absolutePath,
+                "--channel", channel.get(),
+                "--python", pythonVersion.get()
+        ] + abis.get().collectMany { ["--abi", it] }
+        execOperations.exec { it.commandLine(command) }
+    }
+}
 
 plugins {
     id 'com.android.library'
@@ -192,4 +246,35 @@ android {
     }
 
     namespace 'org.telegram.messenger'
+}
+
+// Build the Python plugin API as Python 3.11 bytecode and package it with the core
+// Android library. The runtime/manager which consumes this asset bundle is wired separately.
+Properties pythonSdkLocalProperties = new Properties()
+def pythonSdkLocalPropertiesFile = rootProject.file('local.properties')
+if (pythonSdkLocalPropertiesFile.exists()) {
+    pythonSdkLocalProperties.load(pythonSdkLocalPropertiesFile.newDataInputStream())
+}
+def configuredBuildPython = pythonSdkLocalProperties.getProperty('python.build') ?: System.getenv('BUILD_PYTHON')
+def buildPythonCommand = configuredBuildPython
+        ? [configuredBuildPython]
+        : (OperatingSystem.current().windows ? ['py', '-3.11'] : ['python3.11'])
+def pythonSdkSourceDir = rootProject.file('plugins-pysdk/src')
+def pythonSdkBuildScript = rootProject.file('plugins-pysdk/tools/build_sdk.py')
+def pythonSdkAbis = ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
+
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    def variantTaskName = variant.name.capitalize()
+    def buildSdkTask = tasks.register("buildPythonSdk${variantTaskName}", PythonSdkBuildTask) {
+        pythonCommand.set(buildPythonCommand)
+        pythonVersion.set('3.11')
+        buildScript.set(pythonSdkBuildScript)
+        sources.from(fileTree(pythonSdkSourceDir) {
+            exclude '**/__pycache__/**', '**/*.pyc', '**/.DS_Store'
+        })
+        channel.set(variant.buildType == 'debug' ? 'beta' : 'stable')
+        abis.set(pythonSdkAbis)
+        outputDirectory.set(layout.buildDirectory.dir("generated/plugins/pysdk/${variant.name}"))
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(buildSdkTask, { it.outputDirectory })
 }

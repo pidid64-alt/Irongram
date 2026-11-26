@@ -14,6 +14,14 @@ import tw.nekomimi.nekogram.Extra;
 
 public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
+    public void onCreate() {
+        super.onCreate();
+        Thread sdkInitThread = new Thread(() -> PythonPluginSdk.initialize(this), "python-plugin-sdk-init");
+        sdkInitThread.setDaemon(true);
+        sdkInitThread.start();
+    }
+
+    @Override
     protected String onGetApplicationId() {
         return BuildConfig.APPLICATION_ID;
     }

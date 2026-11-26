@@ -146,7 +146,7 @@
     <string name="MutualContactDescription">This contact is a mutual contact.</string>
     <string name="InviteTextNeko">Hey, I\'m using Nekogram to chat. Join me! Download it here: %1$s</string>
     <string name="ShareNekogram">Share Nekogram...</string>
-    <string name="NekogramVersion">Nekogram %1$s\nBased on Telegram %2$s\nDesigned by %3$s</string>
+    <string name="NekogramVersion">Nekogram %1$s\nBased on Telegram %2$s\nDesigned by %3$s\nPlugin SDK based on exteraGram: https://github.com/exteraSquad/exteraGram</string>
     <string name="UpdateInstalling">Installing update...</string>
     <string name="UpdateInstallingNotification">A notification will be shown when the update completes.</string>
     <string name="UpdateInstallingRelaunch">The app will relaunch when the update completes.</string>
