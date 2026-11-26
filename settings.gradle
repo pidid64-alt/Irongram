@@ -30,6 +30,7 @@ dependencyResolutionManagement {
             content {
                 includeGroup("com.exteragram.hook")
                 includeGroup("com.exteragram.hook.thirdparty")
+                includeGroup("com.bytedance.android")
             }
         }
     }
