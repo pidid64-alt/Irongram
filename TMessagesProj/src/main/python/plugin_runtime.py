@@ -160,10 +160,11 @@ def get_menu_items(menu_type, context=None):
             except BaseException as error:
                 _fail_plugin(entry["plugin"], error)
                 continue
+        icon = entry["icon"]
         items.append({
             "token": entry["token"],
             "text": _menu_item_text(entry, context),
-            "icon": entry["icon"],
+            "icon": "" if icon is None else str(icon),
             "subtext": entry["subtext"],
             "plugin_id": entry["plugin_id"],
             "menu_type": entry["menu_type"],

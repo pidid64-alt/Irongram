@@ -856,10 +856,11 @@ public final class IrongramPluginsController {
                     if (token < 0 || text == null) {
                         continue;
                     }
+                    String iconName = icon == null ? "" : icon.toString();
                     items.add(new PluginMenuItem(
                             token,
                             text.toString(),
-                            icon == null || icon.isNone() ? null : icon.toString()
+                            iconName.isEmpty() ? null : iconName
                     ));
                 }
             } catch (Throwable error) {

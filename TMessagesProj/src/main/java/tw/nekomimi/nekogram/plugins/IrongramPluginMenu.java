@@ -1,5 +1,7 @@
 package tw.nekomimi.nekogram.plugins;
 
+import android.content.Context;
+
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
@@ -69,10 +71,14 @@ public final class IrongramPluginMenu {
     }
 
     private static int iconResource(ChatActivity fragment, String icon) {
+        Context context = fragment.getContext();
+        if (context == null) {
+            return R.drawable.msg_list;
+        }
         if (icon != null && !icon.isEmpty()) {
             try {
-                int resource = fragment.getResources().getIdentifier(
-                        icon, "drawable", fragment.getContext().getPackageName());
+                int resource = context.getResources().getIdentifier(
+                        icon, "drawable", context.getPackageName());
                 if (resource != 0) {
                     return resource;
                 }
