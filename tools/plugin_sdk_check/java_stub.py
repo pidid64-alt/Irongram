@@ -6,6 +6,7 @@ import real exteraGram plugins, so import-level and lifecycle regressions show u
 in CI instead of on a device.
 """
 
+import importlib.util
 import sys
 import types
 
@@ -40,6 +41,28 @@ class Dummy:
 
     def __hash__(self):
         return id(self)
+
+    # Real plugins iterate over Java collections and arrays returned by the app. An empty sequence
+    # keeps such loops harmless in the harness instead of failing with "not iterable".
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, item):
+        raise IndexError(item)
+
+    def __contains__(self, item):
+        return False
+
+    # Reflection walks must terminate: plugins climb the class hierarchy until they reach
+    # java.lang.Object, and a fake superclass would loop forever in the harness.
+    def getSuperclass(self):
+        return None
+
+    def getInterfaces(self):
+        return []
 
 
 class JavaClass(Dummy):
@@ -97,10 +120,26 @@ class _AnyModule(types.ModuleType):
 
 
 class _JavaPackageFinder:
-    def find_module(self, fullname, path=None):
-        if fullname.split(".")[0] in JAVA_ROOTS and fullname != "java":
-            return self
+    """Serve fake modules for Java packages, including nested ones like ``org.telegram.ui``."""
+
+    @staticmethod
+    def _handles(fullname):
+        return fullname.split(".")[0] in JAVA_ROOTS and fullname != "java"
+
+    def find_spec(self, fullname, path=None, target=None):
+        if self._handles(fullname):
+            return importlib.util.spec_from_loader(fullname, self)
         return None
+
+    def create_module(self, spec):
+        # A fake module that answers any attribute, like Chaquopy's Java classes do.
+        return _AnyModule(spec.name)
+
+    def exec_module(self, module):
+        module.__path__ = []
+
+    def find_module(self, fullname, path=None):
+        return self if self._handles(fullname) else None
 
     def load_module(self, fullname):
         if fullname in sys.modules:
@@ -138,7 +177,11 @@ def install():
     sys.modules["java.chaquopy"] = chaquopy
     java.chaquopy = chaquopy
 
+    # A real package path, so "from org.telegram.messenger.browser import Browser" resolves to a
+    # fake submodule instead of failing with "'org.telegram.messenger' is not a package", which
+    # Chaquopy never does on a device.
     telegram = _AnyModule("org.telegram.messenger")
+    telegram.__path__ = []
     telegram.BuildVars = BuildVars
     sys.modules["org.telegram.messenger"] = telegram
 

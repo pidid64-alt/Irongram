@@ -7,6 +7,7 @@ on:
       - 'TMessagesProj/src/main/python/**'
       - 'TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/**'
       - 'TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java'
+      - 'docs/plugins.md'
       - 'tools/plugin_sdk_check/**'
       - '.github/workflows/plugin-api-check.yml'
 
@@ -21,15 +22,22 @@ jobs:
           python-version: '3.11'
 
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip packaging
+        run: python -m pip install --upgrade pip packaging typing_extensions
 
       - name: Check the bundled plugin SDK
         run: python tools/plugin_sdk_check/check_sdk.py
 
+      # Real exteraGram plugins, pinned to the commits that were verified to load. Both .plugin
+      # and .py files are exercised: the runtime treats them identically.
       - name: Load real exteraGram plugins
         run: |
           python tools/plugin_sdk_check/check_sdk.py \
-            --plugin-url https://raw.githubusercontent.com/0x11DFE/Auto-Forwarder-Plugin/v1.9.0/auto_forwarder.py
+            --plugin-url https://raw.githubusercontent.com/0x11DFE/Auto-Forwarder-Plugin/ac3eb490ad4c39005bec308d62008a735f68e662/auto_forwarder.py \
+            --plugin-url "https://raw.githubusercontent.com/mr-Vestr/plugins/65fc42d00dc07e92bdacb1022677faec2c083973/Plugin%20creator/plugin_creator.py" \
+            --plugin-url https://raw.githubusercontent.com/mr-Vestr/plugins/65fc42d00dc07e92bdacb1022677faec2c083973/Templates/templates.py \
+            --plugin-url https://raw.githubusercontent.com/py-sato/Privacy-Cleaner/69398b801af3bff1f1e6c9ea089cac9229e354e5/privacy_cleaner.plugin \
+            --plugin-url https://raw.githubusercontent.com/Th3Nekit/Th3ProxyTools/8bd25418bb2109aa2af4fcd6d72a7e21af5b2c81/Th3ProxyTools.plugin \
+            --plugin-url https://raw.githubusercontent.com/n08i40k/tg-streaks/c769e9c2a2f731da09efd3f544daba7cca8ca195/tg-streaks.py
 
       - name: Show java
         run: java -version || true
