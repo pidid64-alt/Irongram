@@ -1,7 +1,9 @@
 """Runtime loader and event dispatcher for Irongram Python plugins."""
 
+import importlib.machinery
 import importlib.util
 import os
+import re
 import sys
 import traceback
 
@@ -20,6 +22,11 @@ _PYTHON_LIBRARY_DIRECTORY = None
 # their own constructor, which several real exteraGram plugins do.
 _LOAD_CONTEXT = {}
 _MAX_AUTO_INSTALLED_IMPORTS = 8
+_SDK_STARTED = False
+SDK_VERSION = "0"
+APP_VERSION = "0"
+_METADATA_ID_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
+_METADATA_VERSION_PATTERN = re.compile(r"^(>=|<=|==|>|<)(.+)$")
 _JAVA_IMPORT_ROOTS = frozenset({
     "android", "androidx", "com", "dalvik", "java", "javax", "kotlin", "org", "sun"
 })
@@ -28,6 +35,148 @@ try:
     from java.lang.reflect import Modifier as _Modifier
 except Exception:
     _Modifier = None
+
+
+def _import_sdk_version():
+    try:
+        return importlib.import_module("_sdk_version")
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def start_sdk():
+    """Start the vendored exteraGram SDK (``_sdk_version.__start__``).
+
+    Irongram has no ART hooking runtime, so the SDK's Java hook bridge cannot be installed. The
+    SDK is still marked as initialized so its pure-Python modules (metadata parsing, text
+    formatting, markdown helpers) stay usable for plugins.
+    """
+    global _SDK_STARTED, SDK_VERSION, APP_VERSION
+    if _SDK_STARTED:
+        return True
+    sdk = _import_sdk_version()
+    if sdk is None:
+        _SDK_STARTED = True
+        return False
+    SDK_VERSION = str(getattr(sdk, "__version__", SDK_VERSION))
+    try:
+        from org.telegram.messenger import BuildVars
+        APP_VERSION = str(BuildVars.BUILD_VERSION_STRING)
+        sdk.X.BUILD_VERSION = int(BuildVars.BUILD_VERSION)
+    except Exception:
+        pass
+    try:
+        sdk.__start__()
+    except Exception:
+        traceback.print_exc()
+    try:
+        importer = sdk.SafeModeImporter
+        importer.I = True
+        importer.E = False
+        importer.IS_OLD_VERSION = False
+        sdk._remove_safe_mode_importers()
+    except Exception:
+        traceback.print_exc()
+    _SDK_STARTED = True
+    return True
+
+
+def _version_parts(value):
+    parts = []
+    for chunk in re.split(r"[._\-+ ]", str(value or "").strip()):
+        if chunk.isdigit():
+            parts.append(int(chunk))
+        else:
+            break
+    return parts or [0]
+
+
+def compare_versions(operator, current, target):
+    """Compare two dotted versions with ``>=``, ``<=``, ``==``, ``>`` or ``<``."""
+    left = _version_parts(current)
+    right = _version_parts(target)
+    size = max(len(left), len(right))
+    left += [0] * (size - len(left))
+    right += [0] * (size - len(right))
+    if operator == ">=":
+        return left >= right
+    if operator == "<=":
+        return left <= right
+    if operator == ">":
+        return left > right
+    if operator == "<":
+        return left < right
+    if operator == "==":
+        return left == right
+    raise ValueError("Unsupported version operator: {}".format(operator))
+
+
+def _check_version_constraint(kind, constraint, current):
+    match = _METADATA_VERSION_PATTERN.match(str(constraint or "").strip())
+    if match is None:
+        return "Invalid {}: {}".format(kind, constraint)
+    if not compare_versions(match.group(1), current, match.group(2).strip()):
+        return "Plugin requires {} {}, but current is {}".format(
+            kind, constraint, current
+        )
+    return None
+
+
+def read_plugin_metadata(plugin_path):
+    """Parse ``.plugin``/``.py`` metadata without executing the plugin.
+
+    Mirrors exteraGram: the metadata block is evaluated with ``ast`` only, then ``__id__``,
+    ``__name__`` and the optional version constraints are validated. Returns a dictionary with
+    ``error`` set to ``None`` on success.
+    """
+    start_sdk()
+    path = os.path.abspath(str(plugin_path))
+    if not os.path.isfile(path):
+        return {"error": "Plugin file not found: {}".format(path)}
+    try:
+        from extera_utils.metadata_parser import get_metadata
+        raw = get_metadata(path)
+    except Exception as error:
+        return {"error": "Failed to parse plugin metadata: {}".format(error)}
+
+    plugin_id = (raw.get("id") or "").strip() if isinstance(raw.get("id"), str) else raw.get("id")
+    name = (raw.get("name") or "").strip() if isinstance(raw.get("name"), str) else raw.get("name")
+    if not plugin_id or not name:
+        return {"error": "Plugin metadata must contain non-empty '__id__' and '__name__'."}
+    if not _METADATA_ID_PATTERN.match(str(plugin_id)):
+        return {"error": (
+            "Plugin '__id__' must be 2-32 characters long, start with a letter, and contain only "
+            "latin letters, numbers, dashes and underscores."
+        )}
+
+    app_error = None
+    if raw.get("app_version"):
+        app_error = _check_version_constraint("app version", raw["app_version"], APP_VERSION)
+    if app_error:
+        return {"error": app_error}
+    sdk_error = None
+    if raw.get("sdk_version"):
+        sdk_error = _check_version_constraint("sdk version", raw["sdk_version"], SDK_VERSION)
+    if sdk_error:
+        return {"error": sdk_error}
+
+    requirements = [
+        item.strip() for item in str(raw.get("requirements") or "").split(",") if item.strip()
+    ]
+    return {
+        "id": str(plugin_id),
+        "name": str(name),
+        "version": str(raw.get("version") or "1.0"),
+        "author": str(raw.get("author") or ""),
+        "description": str(raw.get("description") or ""),
+        "icon": str(raw.get("icon") or ""),
+        "category": str(raw.get("category") or ""),
+        "requirements": requirements,
+        "app_version": str(raw.get("app_version") or ""),
+        "sdk_version": str(raw.get("sdk_version") or ""),
+        "error": None,
+    }
 
 
 def _new_token():
@@ -505,6 +654,25 @@ def _install_missing_python_import(error, library_directory, attempted_imports):
     return True
 
 
+def _apply_metadata(plugin, metadata):
+    """Copy parsed ``.plugin`` metadata onto the plugin instance, as exteraGram does."""
+    if not metadata or metadata.get("error"):
+        return
+    try:
+        plugin.id = metadata.get("id") or getattr(plugin, "id", "")
+        plugin.name = metadata.get("name") or getattr(plugin, "name", "")
+        plugin.version = metadata.get("version") or getattr(plugin, "version", "1.0")
+        plugin.author = metadata.get("author") or getattr(plugin, "author", "")
+        plugin.description = metadata.get("description") or getattr(plugin, "description", "")
+        plugin.icon = metadata.get("icon") or None
+        plugin.category = metadata.get("category") or None
+        plugin.requirements = list(metadata.get("requirements") or [])
+        plugin.app_version = metadata.get("app_version") or ""
+        plugin.sdk_version = metadata.get("sdk_version") or ""
+    except Exception:
+        traceback.print_exc()
+
+
 def _execute_plugin_module(spec, module_name, library_directory, attempted_imports):
     while True:
         module = importlib.util.module_from_spec(spec)
@@ -533,9 +701,13 @@ def load_plugin(plugin_id, plugin_path, settings_path):
     if plugin_dir not in sys.path:
         sys.path.insert(0, plugin_dir)
 
-    spec = importlib.util.spec_from_file_location(module_name, plugin_path)
+    loader = importlib.machinery.SourceFileLoader(module_name, plugin_path)
+    spec = importlib.util.spec_from_loader(module_name, loader)
     if spec is None or spec.loader is None:
         raise ImportError("Could not create a Python module for this plugin")
+    metadata = read_plugin_metadata(plugin_path)
+    if metadata.get("error"):
+        raise ValueError(metadata["error"])
 
     attempted_imports = set()
     while True:
@@ -571,11 +743,14 @@ def load_plugin(plugin_id, plugin_path, settings_path):
             plugin._plugin_path = plugin_path
             plugin._settings_path = os.path.abspath(str(settings_path))
             plugin._runtime = sys.modules[__name__]
+            _apply_metadata(plugin, metadata)
             plugin.logger = _PluginLogger(plugin)
             plugin._registered_hooks = []
             plugin._registered_send_hook = False
             plugin._registered_menu_items = []
             plugin.on_plugin_load()
+            plugin.initialized = True
+            plugin.enabled = True
             _PLUGINS[plugin_id] = {
                 "plugin": plugin,
                 "module": module,
@@ -609,6 +784,8 @@ def unload_plugin(plugin_id):
         return False
     plugin = entry["plugin"]
     unregister_plugin_hooks(plugin)
+    plugin.enabled = False
+    plugin.initialized = False
     try:
         plugin.on_plugin_unload()
     except Exception:

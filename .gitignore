@@ -17,5 +17,9 @@ google-services.json
 sentry.properties
 TMessagesProj/jni/ffmpeg/build_android
 
-# Irongram plugins: built plugin archives
+# Irongram plugins: locally installed plugin files
 *.plugin
+
+# Python bytecode from the plugin SDK (compiled on device / by tools)
+__pycache__/
+*.pyc

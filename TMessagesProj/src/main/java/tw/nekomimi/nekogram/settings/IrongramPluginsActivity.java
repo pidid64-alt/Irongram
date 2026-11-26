@@ -23,6 +23,7 @@ import androidx.core.content.FileProvider;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.Browser;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -51,6 +52,8 @@ public final class IrongramPluginsActivity extends BaseNekoSettingsActivity {
     private static final int MENU_ADD_PLUGIN = 19743;
     private static final int MENU_PLUGIN_INFO = 19744;
     private static final int PLUGIN_ROW_BASE = 200000;
+    private static final int PLUGIN_CREDITS_ROW = PLUGIN_ROW_BASE - 1;
+    private static final String SDK_CREDITS_URL = "https://github.com/exteraSquad/exteraGram";
 
     private final int pluginSystemRow = rowId++;
     private final ArrayList<IrongramPluginsController.InstalledPlugin> pluginRows = new ArrayList<>();
@@ -134,6 +137,7 @@ public final class IrongramPluginsActivity extends BaseNekoSettingsActivity {
                     LocaleController.getString(R.string.NoPluginsInstalled),
                     LocaleController.getString(R.string.NoPluginsInstalledDetail)
             ).setEnabled(false));
+            addEngineCredits(items);
             return;
         }
 
@@ -159,6 +163,20 @@ public final class IrongramPluginsActivity extends BaseNekoSettingsActivity {
                     ""
             ).setEnabled(false));
         }
+        addEngineCredits(items);
+    }
+
+    /**
+     * Attribution required by the licence of the exteraGram plugin SDK code vendored into the
+     * Python runtime (GPLv3 with additional terms, see TMessagesProj/src/main/python/EXTERAGRAM_TERMS.md).
+     */
+    private void addEngineCredits(ArrayList<UItem> items) {
+        items.add(UItem.asShadow(null));
+        items.add(TextDetailSettingsCellFactory.of(
+                PLUGIN_CREDITS_ROW,
+                LocaleController.getString(R.string.PluginEngineCredits),
+                SDK_CREDITS_URL
+        ));
     }
 
     private static boolean matchesSearch(IrongramPluginsController.InstalledPlugin plugin, String query) {
@@ -189,6 +207,9 @@ public final class IrongramPluginsActivity extends BaseNekoSettingsActivity {
     @Override
     protected void onItemClick(UItem item, View view, int position, float x, float y) {
         // The master switch and plugin cards handle their own clicks to keep their inline controls independent.
+        if (item.id == PLUGIN_CREDITS_ROW) {
+            Browser.openUrl(getParentActivity(), SDK_CREDITS_URL);
+        }
     }
 
     @Override

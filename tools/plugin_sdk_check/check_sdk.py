@@ -85,8 +85,17 @@ def check_sdk_modules():
                  "get_plugins_dir", "read_file", "write_file"):
         check(hasattr(file_utils, name), "file_utils.{} is missing".format(name))
 
-    for name in ("parse_markdown", "ParsedMarkdown", "MessageEntity", "entities_to_json"):
+    for name in ("parse_markdown", "ParsedMessage", "RawEntity", "TLEntityType",
+                 "count_chars_until", "to_utf16_len"):
         check(hasattr(markdown_utils, name), "markdown_utils.{} is missing".format(name))
+
+    import extera_utils
+    from extera_utils import metadata_parser, text_formatting
+    check(hasattr(extera_utils, "__name__"), "extera_utils package is missing")
+    check(hasattr(metadata_parser, "get_metadata"), "extera_utils.metadata_parser.get_metadata is missing")
+    for name in ("parse_text", "Markdown", "HTML"):
+        check(hasattr(text_formatting, name),
+              "extera_utils.text_formatting.{} is missing".format(name))
 
     for name in ("show_info", "show_success", "show_error", "show_with_button",
                  "show_copied_to_clipboard"):
@@ -108,29 +117,95 @@ def check_sdk_modules():
 
 
 def check_markdown():
-    from markdown_utils import parse_markdown
+    from markdown_utils import TLEntityType, parse_markdown, to_utf16_len
 
-    cases = [
-        ("**bold** and `code`", "bold and code",
-         [("bold", 0, 4), ("code", 9, 4)]),
-        ("**bold _it_ x** tail", "bold it x tail",
-         [("bold", 0, 9), ("italic", 5, 2)]),
-        ("a ~~s~~ b ||p|| c __u__ d _i_ e", "a s b p c u d i e",
-         [("strike", 2, 1), ("spoiler", 6, 1), ("underline", 10, 1), ("italic", 14, 1)]),
-        ("[label](https://t.me/x) plain", "label plain", [("text_url", 0, 5)]),
-        ("no markdown", "no markdown", []),
-        ("unclosed **bold", "unclosed **bold", []),
-        ("snake_case_name", "snake_case_name", []),
-    ]
-    for source, text, entities in cases:
-        parsed = parse_markdown(source)
-        if not check(parsed.text == text,
-                     "parse_markdown({!r}).text == {!r} (got {!r})".format(
-                         source, text, parsed.text)):
-            continue
-        spans = [(entity.type, entity.offset, entity.length) for entity in parsed.entities]
-        check(spans == entities,
-              "parse_markdown({!r}) entities {} (got {})".format(source, entities, spans))
+    parsed = parse_markdown("**bold** and `code`")
+    check(parsed.text == "bold and code",
+          "parse_markdown('**bold** and `code`').text == 'bold and code' (got {!r})".format(parsed.text))
+    spans = [(entity.type, entity.offset, entity.length) for entity in parsed.entities]
+    check((TLEntityType.CODE, 9, 4) in spans,
+          "parse_markdown should mark inline code at 9:13 (got {})".format(spans))
+    check(parsed.entities[0].to_tlrpc_object() is not None,
+          "RawEntity.to_tlrpc_object() should return a TLRPC entity")
+
+    link = parse_markdown("[label](https://t.me/x)")
+    check(link.text == "label", "markdown link text should be 'label' (got {!r})".format(link.text))
+    check(link.entities and link.entities[0].type is TLEntityType.TEXT_LINK,
+          "markdown link should produce a TEXT_LINK entity")
+    check(link.entities and link.entities[0].url == "https://t.me/x",
+          "markdown link should carry its url")
+
+    check(to_utf16_len("\U0001F600") == 2, "to_utf16_len should count surrogate pairs")
+
+
+def check_metadata():
+    import os
+    import tempfile
+
+    import plugin_runtime
+
+    workdir = tempfile.mkdtemp(prefix="irongram-metadata-")
+
+    def parse(name, source):
+        path = os.path.join(workdir, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(source)
+        return plugin_runtime.read_plugin_metadata(path)
+
+    ok = parse("good.plugin",
+               '__id__ = "test_plugin"\n'
+               '__name__ = "Test plugin"\n'
+               '__version__ = "1.2.3"\n'
+               '__author__ = "Tester"\n'
+               '__description__ = "Smoke test"\n'
+               '__requirements__ = ["requests>=2.0", "packaging"]\n')
+    check(ok.get("error") is None, "valid .plugin metadata rejected: {}".format(ok.get("error")))
+    check(ok.get("id") == "test_plugin", "metadata id mismatch: {}".format(ok.get("id")))
+    check(ok.get("version") == "1.2.3", "metadata version mismatch: {}".format(ok.get("version")))
+    check(ok.get("requirements") == ["requests>=2.0", "packaging"],
+          "requirements mismatch: {}".format(ok.get("requirements")))
+
+    bad_id = parse("bad_id.plugin", '__id__ = "1nope"\n__name__ = "Bad"\n')
+    check(bad_id.get("error"), "invalid __id__ should be rejected")
+
+    no_name = parse("no_name.plugin", '__id__ = "no_name"\n')
+    check(no_name.get("error"), "missing __name__ should be rejected")
+
+    too_new = parse("too_new.plugin",
+                    '__id__ = "too_new"\n__name__ = "Too new"\n__app_version__ = ">=99.0.0"\n')
+    check(too_new.get("error"), "unsatisfied __app_version__ should be rejected")
+
+    probe = os.path.join(workdir, "meta_probe.plugin")
+    with open(probe, "w", encoding="utf-8") as handle:
+        handle.write(
+            '__id__ = "meta_probe"\n'
+            '__name__ = "Meta probe"\n'
+            '__version__ = "2.5.0"\n'
+            '__author__ = "Tester"\n'
+            'from base_plugin import BasePlugin\n'
+            'class Probe(BasePlugin):\n'
+            '    pass\n'
+        )
+    import plugin_runtime
+    plugin_runtime.load_plugin("meta_probe", probe, workdir)
+    instance = plugin_runtime._PLUGINS["meta_probe"]["plugin"]
+    check(getattr(instance, "id", None) == "meta_probe",
+          "loaded .plugin should expose self.id (got {!r})".format(getattr(instance, "id", None)))
+    check(getattr(instance, "name", None) == "Meta probe",
+          "loaded .plugin should expose self.name (got {!r})".format(getattr(instance, "name", None)))
+    check(getattr(instance, "version", None) == "2.5.0",
+          "loaded .plugin should expose self.version (got {!r})".format(getattr(instance, "version", None)))
+    check(getattr(instance, "initialized", False) is True,
+          "loaded .plugin should be marked initialized")
+    plugin_runtime.unload_plugin("meta_probe")
+    check(getattr(instance, "initialized", True) is False,
+          "unloaded .plugin should clear initialized")
+
+    sdk_gate = parse("sdk.plugin",
+                     '__id__ = "sdk_gate"\n__name__ = "SDK gate"\n'
+                     '__sdk_version__ = ">=1.0.0"\n')
+    check(sdk_gate.get("error") is None,
+          "satisfied __sdk_version__ rejected: {}".format(sdk_gate.get("error")))
 
 
 def load_plugin(plugin_id, path, workdir):
@@ -193,6 +268,7 @@ def main():
 
     check_sdk_modules()
     check_markdown()
+    check_metadata()
     if args.plugin_url or args.plugin_path:
         check_plugins(args.plugin_url, args.plugin_path)
 

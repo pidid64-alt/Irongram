@@ -21,8 +21,11 @@ public final class PluginMetadata {
     public final String description;
     public final String icon;
     public final List<String> requirements;
+    public final String appVersion;
+    public final String sdkVersion;
 
-    private PluginMetadata(String id, String name, String version, String author, String description, String icon, List<String> requirements) {
+    public PluginMetadata(String id, String name, String version, String author, String description,
+                          String icon, List<String> requirements, String appVersion, String sdkVersion) {
         this.id = id;
         this.name = name;
         this.version = version;
@@ -30,6 +33,8 @@ public final class PluginMetadata {
         this.description = description;
         this.icon = icon;
         this.requirements = Collections.unmodifiableList(requirements);
+        this.appVersion = appVersion == null ? "" : appVersion;
+        this.sdkVersion = sdkVersion == null ? "" : sdkVersion;
     }
 
     public static PluginMetadata fromSource(String source) {
@@ -51,7 +56,9 @@ public final class PluginMetadata {
                 nonEmpty(readValue(source, "author"), ""),
                 nonEmpty(readValue(source, "description"), ""),
                 nonEmpty(readValue(source, "icon"), ""),
-                readRequirements(source)
+                readRequirements(source),
+                nonEmpty(readValue(source, "app_version"), nonEmpty(readValue(source, "min_version"), "")),
+                nonEmpty(readValue(source, "sdk_version"), "")
         );
     }
 

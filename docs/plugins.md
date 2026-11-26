@@ -9,10 +9,33 @@ Irongram process; install only code and dependencies you trust. Plugins are not 
 The runtime is Python 3.11 via Chaquopy. The app minimum Android version is API 24 because
 that is the minimum supported by this Python runtime.
 
+## Vendored exteraGram SDK
+
+Parts of exteraGram's own plugin SDK (`exteraSquad/exteraGram`, `plugins-pysdk/`) are vendored
+verbatim into `TMessagesProj/src/main/python/`, so plugins see the same metadata parser, version
+checks, and helper modules as they do on exteraGram:
+
+- `_sdk_version.py` — the SDK bootstrap (`SafeModeImporter`, `check_safemode`, `__start__`).
+  Vendored unmodified along with `markdown_utils.py`, `extera_utils/__init__.py`,
+  `extera_utils/metadata_parser.py`, `extera_utils/text_formatting.py` and
+  `extera_utils/get_caller.py`; every file keeps its upstream copyright header.
+- `plugin_runtime.read_plugin_metadata(path)` runs `extera_utils.metadata_parser` over a plugin
+  file with Python's `ast` module; the plugin source is never executed during import or preview.
+  Settings → Plugins and the chat `.plugin` install preview both use it, so the metadata and error
+  messages are the same as on exteraGram.
+- The vendored code is GPLv3-or-later with exteraGram's additional terms; the terms are kept in
+  `TMessagesProj/src/main/python/EXTERAGRAM_TERMS.md`. The Plugins screen carries the attribution
+  they require.
+
 ## Metadata and example
 
-A plugin needs literal top-level `__id__` and `__name__` values. `__version__`, `__author__`,
-`__description__`, and `__requirements__` are also read:
+A plugin needs literal top-level `__id__` and `__name__` values, exactly as on exteraGram:
+`__id__` must match `^[a-zA-Z][a-zA-Z0-9_-]{1,31}$`, `__name__` must be non-empty. Also read are
+`__version__` (defaults to `1.0`), `__author__`, `__description__`, `__icon__`, `__category__`,
+`__requirements__` (a list, or a comma-separated string), `__min_version__` / `__app_version__`
+(for example `">=11.12.1"`, compared against the app version) and `__sdk_version__` (compared
+against the bundled SDK version, currently `1.4.6.5`). Metadata errors are reported verbatim, for
+example `Plugin requires app version >=11.12.1, but current is 13.0.2`:
 
 ```python
 __id__ = "example_rewriter"
@@ -91,10 +114,11 @@ class ExampleRewriter(BasePlugin):
   - `file_utils`: `get_cache_dir`, `get_files_dir`, `get_external_files_dir`,
     `get_external_cache_dir`, `get_plugins_dir` (all return absolute paths as `str`) plus
     `read_file(path)` and `write_file(path, data, append=False)`.
-  - `markdown_utils`: `parse_markdown(text)` returning `ParsedMarkdown(text, entities)` where each
-    entity converts to a `TLRPC.TL_messageEntity*` object with `to_tlrpc_object()`; supports bold,
-    italic, underline, strike, spoiler, inline code, fenced code, `[text](url)` links, and `\`
-    escapes.
+  - `markdown_utils`: exteraGram's own module, re-exported unchanged — `parse_markdown(text)`
+    returning `ParsedMessage(text, entities)` where each `RawEntity` carries a `TLEntityType`
+    (`BOLD`, `ITALIC`, `UNDERLINE`, `STRIKE`, `SPOILER`, `CODE`, `PRE`, `TEXT_LINK`, ...) and
+    converts to a `TLRPC.TL_messageEntity*` object with `to_tlrpc_object()`; also `count_chars_until`
+    and `to_utf16_len`. Offsets and lengths are UTF-16 units, as Telegram expects.
   - `client_utils`: `get_send_messages_helper`, `get_file_loader`, `get_last_fragment`,
     `get_user_config`, `get_account_instance`, `get_messages_controller`,
     `get_connections_manager`, `get_contacts_controller`, `get_notifications_controller`,
@@ -129,7 +153,12 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 - Rendered plugin menus, custom Android-view settings factories, and application lifecycle events
   are not implemented. The supported built-in settings controls are a limited subset of the
   exteraGram settings API.
-- `.elyx` / `.eaf` structured plugin formats and app/SDK version constraints are not implemented.
+- `.elyx` / `.eaf` structured plugin formats are not implemented; `.plugin` and `.py` files are
+  plain Python source and are treated identically.
+- exteraGram's SDK refuses to run plugins when its own build counter is too low and raises
+  "App version is too old" through `SafeModeImporter`. Irongram has no such counter, so
+  `plugin_runtime.start_sdk()` calls `__start__()` and then clears that gate. Compatibility is
+  still enforced by `__app_version__` / `__sdk_version__` metadata against the real app version.
 
 `python tools/plugin_sdk_check/check_sdk.py --plugin-path <file>` loads a plugin through
 `plugin_runtime.load_plugin` against a stubbed Chaquopy environment (`tools/plugin_sdk_check/`); the

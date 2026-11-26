@@ -110,10 +110,58 @@ class _PluginLogger:
         self.info("%r", value)
 
 
+class PluginError(Exception):
+    """Raised by the exteraGram SDK when plugin code reports an error."""
+
+    def __init__(self, message, plugin_id=None):
+        super().__init__(message)
+        self.plugin_id = plugin_id
+
+
+class PluginMetadata:
+    """Metadata of an installed plugin, mirroring exteraGram's ``PluginMetadata`` dataclass."""
+
+    def __init__(self, id="", name="", version="1.0", author="", description="", icon=None,
+                 requirements=None, category=None):
+        self.id = id
+        self.name = name
+        self.version = version
+        self.author = author
+        self.description = description
+        self.icon = icon
+        self.requirements = list(requirements or [])
+        self.category = category
+
+    def __repr__(self):
+        return "PluginMetadata(id={!r}, name={!r}, version={!r})".format(
+            self.id, self.name, self.version
+        )
+
+
+class IntentHookType(Enum):
+    BEFORE = "before"
+    AFTER = "after"
+
+
 class BasePlugin:
     """Base class matching the lifecycle and event-hook surface used by exteraGram."""
 
     def __init__(self):
+        # Attributes with the same names/semantics as exteraGram's BasePlugin, because plugins
+        # read them (``self.id``, ``self.version``, ...) and the host fills them from metadata.
+        self.id = ""
+        self.name = ""
+        self.description = ""
+        self.author = ""
+        self.version = ""
+        self.icon = None
+        self.category = None
+        self.requirements = []
+        self.app_version = ""
+        self.sdk_version = ""
+        self.error_message = None
+        self.enabled = False
+        self.initialized = False
         self._plugin_id = None
         self._plugin_path = None
         self._settings_path = None

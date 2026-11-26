@@ -78,6 +78,7 @@
     <string name="PluginSystemToggle">Enable plugin system</string>
     <string name="PluginSystemToggleDescription">Turn this off to pause all plugins. Individual plugin switches are kept.</string>
     <string name="InstalledPlugins">Installed plugins</string>
+    <string name="PluginEngineCredits">Plugin engine based on exteraGram</string>
     <string name="NoPluginSearchResults">No plugins match your search.</string>
     <string name="PluginSystemPaused">The plugin system is paused, so this plugin is not running.</string>
     <string name="PluginSettingsUnavailable">Enable the plugin system and this plugin before opening its settings.</string>

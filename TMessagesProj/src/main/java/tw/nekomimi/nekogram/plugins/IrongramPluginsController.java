@@ -196,7 +196,7 @@ public final class IrongramPluginsController {
                 if (sourceFile == null || !sourceFile.isFile()) {
                     throw new IllegalArgumentException("Could not open the plugin file");
                 }
-                metadata = PluginMetadata.fromSource(readFile(sourceFile));
+                metadata = readPluginMetadata(sourceFile);
             } catch (Throwable error) {
                 errorMessage = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
                 FileLog.e(error);
@@ -254,25 +254,68 @@ public final class IrongramPluginsController {
     }
 
     private PluginMetadata installPluginBytes(byte[] bytes) throws Exception {
-        PluginMetadata metadata = PluginMetadata.fromSource(new String(bytes, StandardCharsets.UTF_8));
         File directory = getPluginsDirectory();
         if (!directory.exists() && !directory.mkdirs()) {
             throw new IllegalStateException("Could not create the plugins directory");
         }
-        File target = new File(directory, metadata.id + ".py");
-        if (target.exists()) {
-            throw new IllegalArgumentException("A plugin with this ID is already installed");
+        File temporary = new File(directory, ".import-" + System.nanoTime() + ".plugin");
+        try {
+            try (FileOutputStream output = new FileOutputStream(temporary)) {
+                output.write(bytes);
+                output.getFD().sync();
+            }
+            PluginMetadata metadata = readPluginMetadata(temporary);
+            File target = new File(directory, metadata.id + ".py");
+            if (target.exists()) {
+                throw new IllegalArgumentException("A plugin with this ID is already installed");
+            }
+            if (!temporary.renameTo(target)) {
+                throw new IllegalStateException("Could not install the plugin file");
+            }
+            temporary = null;
+            return metadata;
+        } finally {
+            if (temporary != null && temporary.exists()) {
+                temporary.delete();
+            }
         }
-        File temporary = new File(directory, metadata.id + ".py.tmp");
-        try (FileOutputStream output = new FileOutputStream(temporary)) {
-            output.write(bytes);
-            output.getFD().sync();
+    }
+
+    /**
+     * Read plugin metadata with the exteraGram-compatible parser.
+     *
+     * <p>Metadata is evaluated with Python's {@code ast} only, so the plugin is never executed. The
+     * parser returns the same keys exteraGram requires ({@code __id__}, {@code __name__}, version
+     * constraints, requirements) and rejects incompatible plugins with the same error messages.
+     * The fast Java parser is only a fallback for when Python cannot be started.</p>
+     */
+    private PluginMetadata readPluginMetadata(File file) throws Exception {
+        try {
+            synchronized (pythonLock) {
+                PyObject metadata = ensureRuntimeLocked().callAttr(
+                        "read_plugin_metadata", file.getAbsolutePath());
+                String error = readStringAttribute(metadata, "error");
+                if (error != null) {
+                    throw new IllegalArgumentException(error);
+                }
+                return new PluginMetadata(
+                        readStringAttribute(metadata, "id"),
+                        readStringAttribute(metadata, "name"),
+                        nonEmpty(readStringAttribute(metadata, "version"), "1.0"),
+                        nonEmpty(readStringAttribute(metadata, "author"), ""),
+                        nonEmpty(readStringAttribute(metadata, "description"), ""),
+                        nonEmpty(readStringAttribute(metadata, "icon"), ""),
+                        readStringListAttribute(metadata, "requirements"),
+                        nonEmpty(readStringAttribute(metadata, "app_version"), ""),
+                        nonEmpty(readStringAttribute(metadata, "sdk_version"), "")
+                );
+            }
+        } catch (IllegalArgumentException error) {
+            throw error;
+        } catch (Throwable error) {
+            FileLog.e("Falling back to the Java plugin metadata parser", error);
         }
-        if (!temporary.renameTo(target)) {
-            temporary.delete();
-            throw new IllegalStateException("Could not install the plugin file");
-        }
-        return metadata;
+        return PluginMetadata.fromSource(readFile(file));
     }
 
     public void setPluginSystemEnabled(boolean enabled, OperationCallback callback) {
@@ -794,6 +837,38 @@ public final class IrongramPluginsController {
         } catch (Throwable ignored) {
             return fallback;
         }
+    }
+
+    private static String readStringAttribute(PyObject object, String name) {
+        try {
+            PyObject value = object.get(name);
+            if (value == null) {
+                return null;
+            }
+            String text = value.toString();
+            return text.isEmpty() || "None".equals(text) ? null : text;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static List<String> readStringListAttribute(PyObject object, String name) {
+        ArrayList<String> values = new ArrayList<>();
+        try {
+            PyObject value = object.get(name);
+            if (value != null && !"None".equals(value.toString())) {
+                for (PyObject item : value.asList()) {
+                    values.add(item.toString());
+                }
+            }
+        } catch (Throwable ignored) {
+            // A missing or malformed requirement list simply means "no requirements".
+        }
+        return values;
+    }
+
+    private static String nonEmpty(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
     private static int readIntAttribute(PyObject object, String name, int fallback) {

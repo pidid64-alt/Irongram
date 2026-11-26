@@ -80,6 +80,15 @@ def jarray(kind):
     return lambda values: list(values)
 
 
+class BuildVars:
+    """Values the SDK reads from ``org.telegram.messenger.BuildVars`` in the real app."""
+
+    BUILD_VERSION = 7175
+    BUILD_VERSION_STRING = "13.0.2"
+    APP_VERSION_NAME = "13.0.2"
+    DEBUG_VERSION = False
+
+
 class _AnyModule(types.ModuleType):
     def __getattr__(self, item):
         if item.startswith("__"):
@@ -128,6 +137,10 @@ def install():
     chaquopy.jarray = jarray
     sys.modules["java.chaquopy"] = chaquopy
     java.chaquopy = chaquopy
+
+    telegram = _AnyModule("org.telegram.messenger")
+    telegram.BuildVars = BuildVars
+    sys.modules["org.telegram.messenger"] = telegram
 
     java.lang = _AnyModule("java.lang")
     java.lang.reflect = _AnyModule("java.lang.reflect")

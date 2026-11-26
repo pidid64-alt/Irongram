@@ -76,6 +76,7 @@
     <string name="PluginSystemToggle">Включить систему плагинов</string>
     <string name="PluginSystemToggleDescription">Отключите, чтобы приостановить все плагины. Индивидуальные переключатели сохраняются.</string>
     <string name="InstalledPlugins">Установленные плагины</string>
+    <string name="PluginEngineCredits">Движок плагинов основан на exteraGram</string>
     <string name="NoPluginSearchResults">Плагины не найдены.</string>
     <string name="PluginSystemPaused">Система плагинов приостановлена, поэтому этот плагин не запущен.</string>
     <string name="PluginSettingsUnavailable">Включите систему плагинов и сам плагин, чтобы открыть его настройки.</string>
