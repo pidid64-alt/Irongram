@@ -137,8 +137,14 @@ class ExampleRewriter(BasePlugin):
 
 This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
-- Arbitrary Xposed-style Java method hooking (`hook_method`, `MethodHook`, `MethodReplacement`) is
-  not implemented. Calling `BasePlugin.hook_method` raises `NotImplementedError`.
+- Arbitrary Xposed-style Java method hooking (`hook_method`, `hook_all_methods`,
+  `hook_all_constructors`, `unhook_method`, `hook_call_site`, `hook_field_read`,
+  `hook_field_write`, `hook_string_constant`, `hook_return_value`, `MethodHook`,
+  `MethodReplacement`) is not implemented. All of them raise `NotImplementedError` with an explicit
+  message, so a plugin that depends on patching Java methods fails to load with a readable error
+  instead of silently doing nothing. exteraGram plugins such as
+  `AlexeiCrystal/extera-plugins` (`extera-no-feed-ads`, `extera-easter-eggs-protector`) belong to
+  this group.
 - Only the chat three-dot menu renders plugin entries; message context menus, the drawer, and the
   profile menu do not show plugin entries yet.
 - A narrow subset of `android_utils` is implemented in

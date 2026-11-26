@@ -110,6 +110,13 @@ class _PluginLogger:
         self.info("%r", value)
 
 
+_HOOK_UNAVAILABLE_MESSAGE = (
+    "Low-level Xposed method hooks are not available in this Irongram build. "
+    "Plugin features that patch Java methods cannot work; the event hooks "
+    "(pre_request_hook, post_request_hook, on_update_hook, on_send_message_hook) do work."
+)
+
+
 class PluginError(Exception):
     """Raised by the exteraGram SDK when plugin code reports an error."""
 
@@ -232,9 +239,34 @@ class BasePlugin:
         return token
 
     def hook_method(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Low-level Xposed method hooks are not available in this Irongram build."
-        )
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_all_methods(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_all_constructors(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def unhook_method(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_call_site(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_field_read(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_field_write(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_string_constant(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def hook_return_value(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+
+    def unhook_partial(self, *args, **kwargs):
+        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
 
     def unhook_all(self):
         if self._runtime is not None:
