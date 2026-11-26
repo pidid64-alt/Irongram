@@ -69,7 +69,7 @@ jobs:
             printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > TMessagesProj_App/google-services.json
           else
             cat > TMessagesProj_App/google-services.json <<'JSON'
-          {"project_info":{"project_number":"123456789","project_id":"compile-only","storage_bucket":"compile-only.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789:android:0123456789abcdef","android_client_info":{"package_name":"tw.nekomimi.nekogram"}},"api_key":[{"current_key":"compile-only"}],"services":{}}],"configuration_version":"1"}
+          {"project_info":{"project_number":"123456789","project_id":"compile-only","storage_bucket":"compile-only.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789:android:0123456789abcdef","android_client_info":{"package_name":"tw.nekomimi.nekogram"}},"api_key":[{"current_key":"compile-only"}],"services":{}},{"client_info":{"mobilesdk_app_id":"1:123456789:android:fedcba9876543210","android_client_info":{"package_name":"tw.nekomimi.nekogram.beta"}},"api_key":[{"current_key":"compile-only"}],"services":{}}],"configuration_version":"1"}
           JSON
           fi
 
