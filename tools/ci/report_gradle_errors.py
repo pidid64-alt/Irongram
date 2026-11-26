@@ -31,12 +31,10 @@ def main():
     for index, line in enumerate(lines):
         if COMPILER_PATTERN.search(line):
             compiler_errors.append(line)
-        elif any(marker in line for marker in WINDOW_MARKERS):
+        elif any(marker in line for marker in WINDOW_MARKERS) or GRADLE_PATTERN.search(line):
             gradle_errors.append(" | ".join(
                 part.strip() for part in lines[index:index + 6] if part.strip()
             ))
-        elif GRADLE_PATTERN.search(line):
-            gradle_errors.append(line)
 
     seen = set()
     emitted = 0
