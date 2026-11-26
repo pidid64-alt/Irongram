@@ -169,11 +169,22 @@ This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
 `python tools/plugin_sdk_check/check_sdk.py --plugin-path <file>` loads a plugin through
 `plugin_runtime.load_plugin` against a stubbed Chaquopy environment (`tools/plugin_sdk_check/`); the
-`Plugin API check` workflow runs it on every change to the SDK. It currently loads
-`0x11DFE/Auto-Forwarder-Plugin` (`auto_forwarder.py`), `mr-Vestr/plugins` (`plugin_creator.py`,
-`templates.py`, `ADB Lite/adb_lite.plugin`), `py-sato/Privacy-Cleaner` (`privacy_cleaner.py`), and
-`Th3Nekit/Th3ProxyTools` (`Th3ProxyTools.plugin`). Those runs exercise imports, plugin construction,
-`create_settings()`, and menu registration only — not on-device behaviour. Whole-client mods such as
+`Plugin API check` workflow runs it on every change to the SDK. It loads the bundled SDK contract
+checks plus these plugins, pinned to commits known to load:
+
+| Plugin | File | Kind |
+| --- | --- | --- |
+| `0x11DFE/Auto-Forwarder-Plugin` | `auto_forwarder.py` | `.py`, 19 settings, 1 chat menu entry |
+| `mr-Vestr/plugins` | `Plugin creator/plugin_creator.py` | `.py`, 14 settings |
+| `mr-Vestr/plugins` | `Templates/templates.py` | `.py`, 13 settings |
+| `mr-Vestr/plugins` | `ADB Lite/adb_lite.plugin` | `.plugin`, 14 settings |
+| `py-sato/Privacy-Cleaner` | `privacy_cleaner.plugin` | `.plugin`, 17 settings, 1 chat menu entry |
+| `Th3Nekit/Th3ProxyTools` | `Th3ProxyTools.plugin` | `.plugin`, 15 settings |
+| `n08i40k/tg-streaks` | `tg-streaks.py` | `.py` |
+
+Those runs exercise imports, plugin construction, `create_settings()`, and menu registration only —
+not on-device behaviour. Plugins that patch Java methods (`AlexeiCrystal/extera-plugins`,
+`nonFeature/LiteGram`, `repinek/LegacyGram`) stop at the `NotImplementedError` described above. Whole-client mods such as
 `nonFeature/LiteGram` and `repinek/LegacyGram` are not compatible: they are Python packages that
 expect Java method hooking (`hook_method`) and their own DEX utilities.
 
