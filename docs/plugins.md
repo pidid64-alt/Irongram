@@ -65,7 +65,8 @@ class ExampleRewriter(BasePlugin):
 
 ## Implemented API surface
 
-- Install, enable, disable, remove, and restore enabled `.py` plugins at app startup.
+- Install, enable, disable, remove, and restore enabled `.py` and `.plugin` plugins at app
+  startup.
 - `on_plugin_load` / `on_plugin_unload`, per-plugin JSON settings (`get_setting`, `set_setting`,
   `export_settings`, `import_settings`), and Logcat logger methods. Settings are already readable
   and writable inside a plugin's `__init__`, which several real plugins rely on.
