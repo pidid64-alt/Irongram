@@ -49,12 +49,12 @@ public final class PythonMethodHook extends XC_MethodHook {
     }
 
     @Override
-    protected void beforeHookedMethod(MethodHookParam param) {
+    public void beforeHookedMethod(MethodHookParam param) {
         invoke(before, beforeFilters, param, true, "before_hooked_method");
     }
 
     @Override
-    protected void afterHookedMethod(MethodHookParam param) {
+    public void afterHookedMethod(MethodHookParam param) {
         invoke(after, afterFilters, param, false, "after_hooked_method");
     }
 

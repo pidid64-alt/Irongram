@@ -101,8 +101,8 @@
 -keep class com.exteragram.hook.** { *; }
 -keep class de.robv.android.xposed.** { *; }
 -keepclassmembers class * extends de.robv.android.xposed.XC_MethodHook {
-    protected void beforeHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
-    protected void afterHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
+    public void beforeHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
+    public void afterHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
 }
 -dontwarn com.exteragram.hook.**
 -dontwarn de.robv.android.xposed.**

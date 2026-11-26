@@ -30,7 +30,7 @@ public final class PythonMethodReplacement extends XC_MethodReplacement {
     }
 
     @Override
-    protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
+    public Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
         if (disabled || !HookBridge.isPluginActive(pluginId)) {
             return HookBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
         }

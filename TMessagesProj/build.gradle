@@ -131,6 +131,10 @@ dependencies {
     // exteraHook's Xposed compatibility layer and ART hook runtime. The artifacts live in
     // Tools/maven (see settings.gradle); the native part is linked into tmessages.49.
     implementation 'com.exteragram.hook:hook-core:1.0.0'
+    // Declared explicitly: prefab native packages are only exposed to the CMake build for direct
+    // dependencies, even though hook-core pulls both in transitively.
+    implementation 'com.exteragram.hook.thirdparty:lsplant:6.4-extera.8'
+    implementation 'com.bytedance.android:shadowhook:2.0.1'
     // Used by hook conditions (HookFilter.Condition) and by exteraHook internally.
     implementation 'org.mvel:mvel2:2.5.4.Final'
     implementation 'org.apache.commons:commons-text:1.15.0'
