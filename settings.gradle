@@ -2,6 +2,7 @@ pluginManagement {
     includeBuild('build-logic')
     includeBuild('TMessagesProj_Modules/media/build-logic-settings')
     repositories {
+        maven { url = uri("$rootDir/Tools/maven") }
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -20,6 +21,7 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        maven { url = uri("$rootDir/Tools/maven") }
         google()
         mavenCentral()
     }
