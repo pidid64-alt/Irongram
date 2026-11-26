@@ -105,7 +105,9 @@ class RTC_EXPORT Candidate {
   // cricket::LOCAL_PORT_TYPE). The type should really be an enum rather than a
   // string, but until we make that change the lifetime attribute helps us lock
   // things down. See also the `Port` class.
-  void set_type(absl::string_view type ABSL_ATTRIBUTE_LIFETIME_BOUND) {
+  // Clang 21 rejects [[clang::lifetimebound]] on a parameter of a void function
+  // ("did you mean 'lifetime_capture_by(X)'"), so the annotation is dropped here.
+  void set_type(absl::string_view type) {
     Assign(type_, type);
   }
 
