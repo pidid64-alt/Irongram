@@ -218,6 +218,44 @@ def unregister_plugin_hooks(plugin):
     _REQUEST_HOOKS[:] = [hook for hook in _REQUEST_HOOKS if hook["plugin"] is not plugin]
     _SEND_MESSAGE_HOOKS[:] = [hook for hook in _SEND_MESSAGE_HOOKS if hook["plugin"] is not plugin]
     _MENU_ITEMS[:] = [item for item in _MENU_ITEMS if item["plugin"] is not plugin]
+    _remove_java_hooks(plugin)
+    _set_plugin_active(plugin, False)
+
+
+def _remove_java_hooks(plugin):
+    """Remove every ART method hook the plugin installed (see base_plugin.hook_method)."""
+    hooks = getattr(plugin, "_java_hooks", None)
+    if not hooks:
+        return
+    try:
+        bridge = _hook_bridge()
+    except Exception:
+        hooks[:] = []
+        return
+    for unhook in list(hooks):
+        try:
+            bridge.unhook(unhook)
+        except Exception:
+            traceback.print_exc()
+    hooks[:] = []
+
+
+def _hook_bridge():
+    from base_plugin import _hook_bridge as bridge
+    return bridge()
+
+
+def _set_plugin_active(plugin, active):
+    """Tell the Java hook runtime whether this plugin's hooks may run."""
+    try:
+        from base_plugin import _hook_bridge as bridge
+        bridge().setPluginActive(
+            str(getattr(plugin, "_plugin_id", None) or getattr(plugin, "id", "") or ""),
+            bool(active)
+        )
+    except Exception:
+        # Hooking is optional: without Chaquopy's java module the app runs hooks-less.
+        pass
 
 
 def _menu_context(context):
@@ -751,6 +789,7 @@ def load_plugin(plugin_id, plugin_path, settings_path):
             plugin.on_plugin_load()
             plugin.initialized = True
             plugin.enabled = True
+            _set_plugin_active(plugin, True)
             _PLUGINS[plugin_id] = {
                 "plugin": plugin,
                 "module": module,

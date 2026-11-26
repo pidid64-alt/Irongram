@@ -62,6 +62,8 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
+            // Both the vendored hook runtime and our own native library use the shared C++ runtime.
+            pickFirsts += ['**/libc++_shared.so', '**/libshadowhook.so']
         }
     }
 

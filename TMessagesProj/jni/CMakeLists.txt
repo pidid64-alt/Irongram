@@ -180,6 +180,22 @@ target_compile_definitions(sqlite PUBLIC
 include(${CMAKE_HOME_DIRECTORY}/voip/CMakeLists.txt)
 include(${CMAKE_HOME_DIRECTORY}/colorado/CMakeLists.txt)
 
+# exteraHook: LSPlant based ART hooking, used by the Python plugin engine. The Java half of the
+# hook API (de.robv.android.xposed, com.exteragram.hook) ships as the hook-core AAR; the native half
+# is linked here, and JNI_OnLoad calls ExteraHookJniOnLoad (see jni.c).
+# The vendored hook runtime only ships arm64-v8a and armeabi-v7a native libraries. On other ABIs
+# the client still builds and runs, only plugin method hooking reports itself as unavailable.
+set(EXTERA_HOOK_SUPPORTED_ABI OFF)
+if (ANDROID_ABI STREQUAL "arm64-v8a" OR ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(EXTERA_HOOK_SUPPORTED_ABI ON)
+endif()
+
+if (EXTERA_HOOK_EMBEDDED AND EXTERA_HOOK_SUPPORTED_ABI)
+    find_package(exterahook REQUIRED CONFIG)
+    find_package(lsplant REQUIRED CONFIG)
+    find_package(shadowhook REQUIRED CONFIG)
+endif()
+
 set(NATIVE_LIB "tmessages.49")
 
 #tmessages
@@ -260,6 +276,10 @@ target_include_directories(${NATIVE_LIB} PUBLIC
 target_link_options(${NATIVE_LIB} PRIVATE "-Wl,-z,max-page-size=16384")
 target_link_options(${NATIVE_LIB} PRIVATE "-Wl,-z,common-page-size=16384")
 target_link_options(${NATIVE_LIB} PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+if (EXTERA_HOOK_EMBEDDED AND EXTERA_HOOK_SUPPORTED_ABI)
+    target_compile_definitions(${NATIVE_LIB} PRIVATE EXTERA_HOOK_EMBEDDED=1)
+endif()
+
 target_link_libraries(${NATIVE_LIB}
         -Wl,--whole-archive rnnoise openh264 voipandroid -Wl,--no-whole-archive
         webrtc_absl
@@ -294,6 +314,14 @@ target_link_libraries(${NATIVE_LIB}
         OpenSLES
         colorado
         cpufeatures)
+
+if (EXTERA_HOOK_EMBEDDED AND EXTERA_HOOK_SUPPORTED_ABI)
+    target_link_libraries(${NATIVE_LIB}
+            exterahook::exterahook
+            lsplant::lsplant
+            lsplant::dex_builder_static
+            shadowhook::shadowhook)
+endif()
 
 #if (${ANDROID_ABI} STREQUAL "x86" OR ${ANDROID_ABI} STREQUAL "x86_64")
 #    target_link_libraries(${NATIVE_LIB}

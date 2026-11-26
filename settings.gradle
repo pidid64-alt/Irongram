@@ -22,6 +22,16 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Vendored artifacts: exteraHook's Xposed compatibility layer (hook-core) and its LSPlant
+        // fork (lsplant). See TMessagesProj/src/main/java/tw/nekomimi/nekogram/plugins/hooks/
+        // and docs/plugins.md.
+        maven {
+            url = uri("./Tools/maven")
+            content {
+                includeGroup("com.exteragram.hook")
+                includeGroup("com.exteragram.hook.thirdparty")
+            }
+        }
     }
 }
 

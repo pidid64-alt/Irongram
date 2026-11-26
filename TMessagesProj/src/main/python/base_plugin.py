@@ -117,6 +117,197 @@ _HOOK_UNAVAILABLE_MESSAGE = (
 )
 
 
+class XposedHook:
+    """Base class for Java method hooks, mirroring exteraGram's ``XposedHook``."""
+
+
+class MethodHook(XposedHook):
+    """Before/after callback pair for ``hook_method``; override either phase."""
+
+    def before_hooked_method(self, param):
+        pass
+
+    def after_hooked_method(self, param):
+        pass
+
+
+class MethodReplacement(XposedHook):
+    """Replacement for a hooked method: whatever ``replace_hooked_method`` returns is used."""
+
+    def replace_hooked_method(self, param):
+        raise NotImplementedError("replace_hooked_method must be overridden")
+
+
+class HookFilterData:
+    """One hook filter, matching exteraGram's ``HookFilterData``."""
+
+    def __init__(self, filter_type, arg_index=None, or_filters=None, mvel_expression=None,
+                 instance_of=None, object=None):
+        self.filter_type = filter_type
+        self.arg_index = arg_index
+        self.or_filters = or_filters
+        self.mvel_expression = mvel_expression
+        self.instance_of = instance_of
+        self.object = object
+
+    def to_java_filter(self):
+        bridge = _hook_bridge()
+        java_filter = bridge.createFilter(self.filter_type)
+        if self.arg_index is not None:
+            java_filter.argIndex = self.arg_index
+        if self.or_filters:
+            java_filter.orFilters = _java_filter_list(self.or_filters)
+        if self.mvel_expression is not None:
+            java_filter.mvelExpression = self.mvel_expression
+        if self.instance_of is not None:
+            java_filter.instanceOf = self.instance_of
+        if self.object is not None:
+            java_filter.object = self.object
+        return java_filter
+
+    def __repr__(self):
+        return "HookFilterData({!r})".format(self.filter_type)
+
+
+class HookFilter(Enum):
+    """Result filters that can be attached to a hook phase, as in exteraGram."""
+
+    RESULT_IS_NULL = "result_is_null"
+    RESULT_IS_TRUE = "result_is_true"
+    RESULT_IS_FALSE = "result_is_false"
+    RESULT_NOT_NULL = "result_not_null"
+    ARGUMENT_IS_NULL = "argument_is_null"
+    ARGUMENT_IS_TRUE = "argument_is_true"
+    ARGUMENT_IS_FALSE = "argument_is_false"
+    ARGUMENT_NOT_NULL = "argument_not_null"
+
+    @property
+    def filter_data(self):
+        return HookFilterData(self.value)
+
+    @staticmethod
+    def ResultIsInstanceOf(clazz):
+        return HookFilterData("result_is_instance_of", instance_of=clazz)
+
+    @staticmethod
+    def ResultEqual(value):
+        return HookFilterData("result_equal", object=value)
+
+    @staticmethod
+    def ResultNotEqual(value):
+        return HookFilterData("result_not_equal", object=value)
+
+    @staticmethod
+    def ArgumentIsInstanceOf(index, clazz):
+        return HookFilterData("argument_is_instance_of", arg_index=index, instance_of=clazz)
+
+    @staticmethod
+    def ArgumentEqual(index, value):
+        return HookFilterData("argument_equal", arg_index=index, object=value)
+
+    @staticmethod
+    def ArgumentNotEqual(index, value):
+        return HookFilterData("argument_not_equal", arg_index=index, object=value)
+
+    @staticmethod
+    def ArgumentIsNull(index):
+        return HookFilterData("argument_is_null", arg_index=index)
+
+    @staticmethod
+    def ArgumentIsTrue(index):
+        return HookFilterData("argument_is_true", arg_index=index)
+
+    @staticmethod
+    def ArgumentIsFalse(index):
+        return HookFilterData("argument_is_false", arg_index=index)
+
+    @staticmethod
+    def ArgumentNotNull(index):
+        return HookFilterData("argument_not_null", arg_index=index)
+
+    @staticmethod
+    def Condition(expression):
+        return HookFilterData("condition", mvel_expression=expression)
+
+    @staticmethod
+    def Or(*filters):
+        return HookFilterData("or", or_filters=list(filters))
+
+
+_HOOK_BRIDGE = None
+
+
+def _hook_bridge():
+    """The Java side of the hook runtime (tw.nekomimi.nekogram.plugins.hooks.HookBridge)."""
+    global _HOOK_BRIDGE
+    if _HOOK_BRIDGE is None:
+        from java import jclass
+        _HOOK_BRIDGE = jclass("tw.nekomimi.nekogram.plugins.hooks.HookBridge")
+    return _HOOK_BRIDGE
+
+
+def hook_runtime_available():
+    """True when low-level Java method hooking works in this build."""
+    try:
+        return bool(_hook_bridge().isAvailable())
+    except Exception:
+        return False
+
+
+def _java_filter_list(filters):
+    from java import jclass
+    array_list = jclass("java.util.ArrayList")()
+    for item in filters or ():
+        if isinstance(item, HookFilter):
+            item = item.filter_data
+        if isinstance(item, HookFilterData):
+            item = item.to_java_filter()
+        if item is not None:
+            array_list.add(item)
+    return array_list
+
+
+def _filters_of(callback):
+    """Filters attached to a hook phase with @hook_filters / @fn_hook_filters."""
+    if callback is None:
+        return None
+    filters = getattr(callback, "__hook_filters__", None)
+    if filters:
+        return filters
+    source = getattr(callback, "__hook_filters_source__", None)
+    if source:
+        values = getattr(getattr(callback, "__self__", None), source, None)
+        if values:
+            return list(values)
+    return None
+
+
+def _phase_callback(hook, name):
+    """Return a bound method if the plugin actually overrides the given hook phase."""
+    method = getattr(hook, name, None)
+    if not callable(method):
+        return None
+    base = MethodReplacement if name == "replace_hooked_method" else MethodHook
+    base_method = getattr(base, name, None)
+    if base_method is not None and getattr(method, "__func__", None) is base_method:
+        return None
+    return method
+
+
+def _member_name(member):
+    try:
+        return str(member.getName())
+    except Exception:
+        return repr(member)
+
+
+def _class_name(clazz):
+    try:
+        return str(clazz.getName())
+    except Exception:
+        return repr(clazz)
+
+
 class PluginError(Exception):
     """Raised by the exteraGram SDK when plugin code reports an error."""
 
@@ -169,6 +360,8 @@ class BasePlugin:
         self.error_message = None
         self.enabled = False
         self.initialized = False
+        # Unhook handles of Java method hooks installed by this plugin instance.
+        self._java_hooks = []
         self._plugin_id = None
         self._plugin_path = None
         self._settings_path = None
@@ -238,17 +431,135 @@ class BasePlugin:
         self._registered_send_hook = True
         return token
 
-    def hook_method(self, *args, **kwargs):
-        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+    def hook_method(self, method_or_constructor, xposed_hook=None, priority=None, *,
+                    before=None, after=None, before_filters=None, after_filters=None):
+        """Hook a Java method or constructor; returns an ``XC_MethodHook.Unhook`` or ``None``."""
+        if xposed_hook is None and before is None and after is None:
+            raise TypeError("xposed_hook or before or after cannot be None")
+        bridge = _hook_bridge()
+        unhook = None
+        try:
+            replacement = None if xposed_hook is None else _phase_callback(
+                xposed_hook, "replace_hooked_method")
+            if replacement is not None:
+                unhook = bridge.hookReplacement(
+                    method_or_constructor, self._hook_plugin_id(), replacement, priority
+                )
+            else:
+                if before is None and after is None and xposed_hook is not None:
+                    before = _phase_callback(xposed_hook, "before_hooked_method")
+                    after = _phase_callback(xposed_hook, "after_hooked_method")
+                if before is None and after is None:
+                    raise TypeError("xposed_hook has no hook phases to install")
+                if before_filters is None:
+                    before_filters = _filters_of(before)
+                if after_filters is None:
+                    after_filters = _filters_of(after)
+                unhook = bridge.hookMethod(
+                    method_or_constructor,
+                    self._hook_plugin_id(),
+                    before,
+                    after,
+                    priority,
+                    _java_filter_list(before_filters),
+                    _java_filter_list(after_filters),
+                )
+        except Exception as error:
+            self.log("Error while hooking {}: {}".format(_member_name(method_or_constructor), error))
+            if unhook is not None:
+                bridge.unhook(unhook)
+            return None
+        self._track_java_hook(unhook)
+        return unhook
 
-    def hook_all_methods(self, *args, **kwargs):
-        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+    def hook_all_methods(self, hook_class, method_name, xposed_hook=None, priority=None, *,
+                         before=None, after=None, before_filters=None, after_filters=None):
+        """Hook every method with the given name on a class; returns a list of unhooks."""
+        if xposed_hook is None and before is None and after is None:
+            raise TypeError("xposed_hook or before or after cannot be None")
+        if method_name is None:
+            raise TypeError("method_name cannot be None")
+        bridge = _hook_bridge()
+        if before is None and after is None and xposed_hook is not None:
+            before = _phase_callback(xposed_hook, "before_hooked_method")
+            after = _phase_callback(xposed_hook, "after_hooked_method")
+        if before_filters is None:
+            before_filters = _filters_of(before)
+        if after_filters is None:
+            after_filters = _filters_of(after)
+        try:
+            unhooks = bridge.hookAllMethods(
+                hook_class,
+                method_name,
+                self._hook_plugin_id(),
+                before,
+                after,
+                priority,
+                _java_filter_list(before_filters),
+                _java_filter_list(after_filters),
+            )
+        except Exception as error:
+            self.log("Error while hooking {}.{}: {}".format(_class_name(hook_class), method_name, error))
+            return None
+        unhooks = list(unhooks) if unhooks else []
+        for unhook in unhooks:
+            self._track_java_hook(unhook)
+        return unhooks or None
 
-    def hook_all_constructors(self, *args, **kwargs):
-        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+    def hook_all_constructors(self, hook_class, xposed_hook=None, priority=None, *,
+                              before=None, after=None, before_filters=None, after_filters=None):
+        """Hook every constructor of a class; returns a list of unhooks."""
+        if xposed_hook is None and before is None and after is None:
+            raise TypeError("xposed_hook or before or after cannot be None")
+        bridge = _hook_bridge()
+        if before is None and after is None and xposed_hook is not None:
+            before = _phase_callback(xposed_hook, "before_hooked_method")
+            after = _phase_callback(xposed_hook, "after_hooked_method")
+        if before_filters is None:
+            before_filters = _filters_of(before)
+        if after_filters is None:
+            after_filters = _filters_of(after)
+        try:
+            unhooks = bridge.hookAllConstructors(
+                hook_class,
+                self._hook_plugin_id(),
+                before,
+                after,
+                priority,
+                _java_filter_list(before_filters),
+                _java_filter_list(after_filters),
+            )
+        except Exception as error:
+            self.log("Error while hooking constructors of {}: {}".format(_class_name(hook_class), error))
+            return None
+        unhooks = list(unhooks) if unhooks else []
+        for unhook in unhooks:
+            self._track_java_hook(unhook)
+        return unhooks or None
 
-    def unhook_method(self, *args, **kwargs):
-        raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+    def unhook_method(self, unhook):
+        """Remove a hook installed by any of the hook_method helpers."""
+        if unhook is None:
+            return False
+        try:
+            removed = bool(_hook_bridge().unhook(unhook))
+        except Exception:
+            removed = False
+        try:
+            self._java_hooks.remove(unhook)
+        except (AttributeError, ValueError):
+            pass
+        return removed
+
+    def _hook_plugin_id(self):
+        return self._plugin_id or self.id or ""
+
+    def _track_java_hook(self, unhook):
+        if unhook is None:
+            return
+        if not hasattr(self, "_java_hooks") or self._java_hooks is None:
+            self._java_hooks = []
+        self._java_hooks.append(unhook)
 
     def hook_call_site(self, *args, **kwargs):
         raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
@@ -354,19 +665,6 @@ class BasePlugin:
                 os.unlink(temp_path)
 
 
-class MethodHook:
-    def before_hooked_method(self, param):
-        pass
-
-    def after_hooked_method(self, param):
-        pass
-
-
-class MethodReplacement:
-    def replace_hooked_method(self, param):
-        raise NotImplementedError
-
-
 class BaseHook(MethodHook):
     def __init__(self, before=None, after=None):
         self.before = before
@@ -381,63 +679,36 @@ class BaseHook(MethodHook):
             return self.after(param)
 
 
-class HookFilter:
-    RESULT_IS_NULL = object()
-    RESULT_NOT_NULL = object()
-    RESULT_IS_TRUE = object()
-    RESULT_IS_FALSE = object()
-
-    @staticmethod
-    def ResultIsInstanceOf(clazz):
-        return ("result_instance", clazz)
-
-    @staticmethod
-    def ResultEqual(value):
-        return ("result_equal", value)
-
-    @staticmethod
-    def ResultNotEqual(value):
-        return ("result_not_equal", value)
-
-    @staticmethod
-    def ArgumentIsNull(index):
-        return ("argument_null", index)
-
-    @staticmethod
-    def ArgumentNotNull(index):
-        return ("argument_not_null", index)
-
-    @staticmethod
-    def ArgumentIsFalse(index):
-        return ("argument_false", index)
-
-    @staticmethod
-    def ArgumentIsTrue(index):
-        return ("argument_true", index)
-
-    @staticmethod
-    def ArgumentIsInstanceOf(index, clazz):
-        return ("argument_instance", index, clazz)
-
-    @staticmethod
-    def ArgumentEqual(index, value):
-        return ("argument_equal", index, value)
-
-    @staticmethod
-    def ArgumentNotEqual(index, value):
-        return ("argument_not_equal", index, value)
-
-    @staticmethod
-    def Condition(condition, object=None):
-        return ("condition", condition, object)
-
-    @staticmethod
-    def Or(*filters):
-        return ("or", filters)
+def _normalize_hook_filters(filters):
+    """Turn HookFilter/HookFilterData values into HookFilterData, flattening one list level."""
+    if filters and len(filters) == 1 and isinstance(filters[0], (list, tuple)):
+        filters = filters[0]
+    normalized = []
+    for item in filters or ():
+        if isinstance(item, HookFilter):
+            item = item.filter_data
+        if isinstance(item, HookFilterData):
+            normalized.append(item)
+    return normalized
 
 
 def hook_filters(*filters):
+    """Attach filters to a hook phase function, as in exteraGram."""
+
     def decorate(function):
-        function.__irongram_hook_filters__ = filters
+        normalized = _normalize_hook_filters(filters)
+        function.__hook_filters__ = normalized
+        function.__irongram_hook_filters__ = normalized
         return function
+
+    return decorate
+
+
+def fn_hook_filters(field_name):
+    """Filters resolved from a plugin attribute, as in exteraGram (``fn_hook_filters``)."""
+
+    def decorate(function):
+        function.__hook_filters_source__ = field_name
+        return function
+
     return decorate

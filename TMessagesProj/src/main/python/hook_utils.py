@@ -1,145 +1,254 @@
-"""Reflection helpers from exteraGram's ``hook_utils`` module.
+# This is the source code of the exteraGram plugins SDK.
+#
+# We do not and cannot prevent the use of our code,
+# but be respectful and credit the original author.
+#
+# Copyright @exteraGram, 2022-2026
+#
+# Licensed under the GNU GPL v. 3 or later, with the additional terms
+# in ADDITIONAL_TERMS.md at the root of the repository.
 
-Only the reflection part of the original module is implemented: ``find_class``,
-``get_private_field`` and ``set_private_field``. Java method hooking
-(``hook_method``, ``hook_all_methods``) is not available in Irongram, because the
-client does not ship an ART hooking runtime; those helpers raise
-``NotImplementedError`` instead of silently doing nothing.
-"""
+import _sdk_version
+_sdk_version.Z.c()
 
-try:
-    from java import jclass as _jclass
-except Exception as _error:
-    _jclass = None
-    _JAVA_IMPORT_ERROR = _error
-else:
-    _JAVA_IMPORT_ERROR = None
+from typing import Any, Optional
+import traceback
 
-from base_plugin import (  # noqa: F401  (re-exported for compatibility)
-    BaseHook,
-    HookFilter,
-    MethodHook,
-    MethodReplacement,
-    hook_filters,
-)
+from java import jclass
 
-_CLASS_CACHE = {}
+from android_utils import log
 
-_HOOK_UNAVAILABLE_MESSAGE = (
-    "Java method hooking (hook_utils.hook_method) requires an ART hooking runtime, "
-    "which Irongram does not ship. Use the event hooks of BasePlugin instead: "
-    "add_hook(), add_on_send_message_hook()."
-)
+JavaClass = type(jclass("java.lang.Object"))
+JavaObject = jclass("java.lang.Object")
+_JavaLangClass = jclass("java.lang.Class")
 
 
-def _require_java():
-    if _jclass is None:
-        raise RuntimeError(
-            "hook_utils reflection helpers are only available inside Irongram's "
-            "Chaquopy runtime"
-        ) from _JAVA_IMPORT_ERROR
-
-
-def find_class(name):
-    """Return the Java class with the given binary name, e.g. ``org.telegram.ui.LaunchActivity``."""
-    _require_java()
-    name = str(name)
-    if name not in _CLASS_CACHE:
-        _CLASS_CACHE[name] = _jclass(name)
-    return _CLASS_CACHE[name]
-
-
-def _is_class(target):
-    """True when ``target`` is a Java class object rather than an instance."""
+def find_class(class_name: str) -> Optional[JavaClass]:
+    if not isinstance(class_name, str):
+        return None
     try:
-        from java import jclass as java_class_type
-    except Exception:
-        java_class_type = None
-    if java_class_type is not None and isinstance(target, java_class_type):
-        return True
-    # Chaquopy exposes Java classes as instances of a metaclass-like "JavaClass".
-    return type(target).__name__ in ("JavaClass", "jclass", "JavaClassType")
+        return jclass(class_name)
+    except Exception as e:
+        log(f"Error finding class '{class_name}': {e}\n{traceback.format_exc()}")
+        return None
 
 
-def _resolve_field(target, name):
-    if target is None:
-        raise TypeError("get_private_field() requires a class or an instance")
+def get_private_field(obj: JavaObject, field_name: str) -> Optional[Any]:
+    if not isinstance(obj, JavaObject) or not isinstance(field_name, str):
+        return None
+
     try:
-        holder = target if _is_class(target) else target.getClass()
-    except Exception:
-        holder = target
-    clazz = holder
-    while clazz is not None:
-        try:
-            field = clazz.getDeclaredField(str(name))
-            field.setAccessible(True)
-            return field
-        except Exception:
+        clazz = obj.getClass()
+        field = None
+        current_class = clazz
+        while current_class is not None:
             try:
-                clazz = clazz.getSuperclass()
+                field = current_class.getDeclaredField(field_name)
+                break
             except Exception:
-                clazz = None
-    raise AttributeError("No field '{}' in {}".format(name, target))
+                current_class = current_class.getSuperclass()
+
+        if field is None:
+            return None
+
+        field.setAccessible(True)
+        return field.get(obj)
+    except Exception as e:
+        log(f"Error accessing field '{field_name}' on {obj}: {e}\n{traceback.format_exc()}")
+        return None
 
 
-def get_private_field(target, name, default=None):
-    """Return the value of a (possibly private) Java field of a class or an instance."""
+def set_private_field(obj: JavaObject, field_name: str, new_value: Any) -> bool:
+    if not isinstance(obj, JavaObject) or not isinstance(field_name, str):
+        return False
+
     try:
-        field = _resolve_field(target, name)
-    except AttributeError:
-        return default
-    try:
-        return field.get(None if _is_class(target) else target)
-    except Exception:
-        return default
+        clazz = obj.getClass()
+        field = None
+        current_class = clazz
+        while current_class is not None:
+            try:
+                field = current_class.getDeclaredField(field_name)
+                break
+            except Exception:
+                current_class = current_class.getSuperclass()
 
+        if field is None:
+            return False
 
-def set_private_field(target, name, value):
-    """Assign a (possibly private) Java field of a class or an instance. Returns True on success."""
-    try:
-        field = _resolve_field(target, name)
-        field.set(None if _is_class(target) else target, value)
+        field.setAccessible(True)
+        field.set(obj, new_value)
         return True
-    except Exception:
+    except Exception as e:
+        log(f"Error setting field '{field_name}' on {obj}: {e}\n{traceback.format_exc()}")
         return False
 
 
-def find_method(target, name, *parameter_types):
-    """Return a ``java.lang.reflect.Method`` declared by ``target`` or any of its superclasses."""
-    _require_java()
-    try:
-        holder = target if _is_class(target) else target.getClass()
-    except Exception:
-        holder = target
-    clazz = holder
-    while clazz is not None:
+def _java_lang_class(clazz: Any) -> Optional[Any]:
+    if isinstance(clazz, JavaClass):
+        return clazz.getClass()
+    if isinstance(clazz, _JavaLangClass):
+        return clazz
+    return None
+
+
+_PRIMITIVE_BOXES = {
+    "boolean": "java.lang.Boolean", "byte": "java.lang.Byte", "char": "java.lang.Character",
+    "short": "java.lang.Short", "int": "java.lang.Integer", "long": "java.lang.Long",
+    "float": "java.lang.Float", "double": "java.lang.Double", "void": "java.lang.Void",
+}
+
+
+def _class_for_name(name: str) -> Any:
+    base = name.strip()
+    dimensions = 0
+    while base.endswith("[]"):
+        base = base[:-2].rstrip()
+        dimensions += 1
+    if base in _PRIMITIVE_BOXES:
+        java_class = jclass(_PRIMITIVE_BOXES[base]).TYPE
+    else:
+        loader = jclass("org.telegram.messenger.ApplicationLoader").applicationContext.getClassLoader()
+        java_class = _JavaLangClass.forName(base, False, loader)
+    array = jclass("java.lang.reflect.Array")
+    for _ in range(dimensions):
+        java_class = array.newInstance(java_class, 0).getClass()
+    return java_class
+
+
+def java_class(clazz: Any) -> Optional[Any]:
+    """Returns the `java.lang.Class` for a class name, a `find_class(...)` result or a `Class`.
+
+    Names may be primitive (`"int"`), arrays (`"boolean[]"`, `"[Z"`) or binary names of nested
+    classes (`"org.telegram.tgnet.TLRPC$User"`). Returns None if the class cannot be found.
+    """
+    if isinstance(clazz, str):
         try:
-            method = clazz.getDeclaredMethod(str(name), *parameter_types)
+            return _class_for_name(clazz)
+        except Exception as e:
+            log(f"Error finding class '{clazz}': {e}")
+            return None
+    return _java_lang_class(clazz)
+
+
+def _parameter_classes(param_types) -> Optional[list]:
+    classes = []
+    for param_type in param_types:
+        resolved = java_class(param_type)
+        if resolved is None:
+            return None
+        classes.append(resolved)
+    return classes
+
+
+def get_method(clazz: Any, method_name: str, *param_types: Any) -> Optional[Any]:
+    """Finds a method declared in `clazz` or its superclasses and makes it accessible.
+
+    `clazz` and every parameter type accept anything `java_class` accepts.
+    """
+    owner = java_class(clazz)
+    params = _parameter_classes(param_types)
+    if owner is None or params is None:
+        return None
+    current = owner
+    while current is not None:
+        try:
+            method = current.getDeclaredMethod(method_name, *params)
             method.setAccessible(True)
             return method
         except Exception:
-            try:
-                clazz = clazz.getSuperclass()
-            except Exception:
-                clazz = None
-    raise AttributeError("No method '{}' in {}".format(name, target))
+            current = current.getSuperclass()
+    log(f"Method {method_name}({', '.join(p.getName() for p in params)}) not found in {owner.getName()}")
+    return None
 
 
-def hook_method(*args, **kwargs):
-    raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+def get_constructor(clazz: Any, *param_types: Any) -> Optional[Any]:
+    """Finds a constructor of `clazz` and makes it accessible."""
+    owner = java_class(clazz)
+    params = _parameter_classes(param_types)
+    if owner is None or params is None:
+        return None
+    try:
+        constructor = owner.getDeclaredConstructor(*params)
+        constructor.setAccessible(True)
+        return constructor
+    except Exception:
+        log(f"Constructor ({', '.join(p.getName() for p in params)}) not found in {owner.getName()}")
+        return None
 
 
-def unhook_method(*args, **kwargs):
-    raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+def get_field(clazz: Any, field_name: str) -> Optional[Any]:
+    """Finds a field declared in `clazz` or its superclasses and makes it accessible."""
+    owner = java_class(clazz)
+    if owner is None:
+        return None
+    field = _find_declared_field(owner, field_name)
+    if field is None:
+        log(f"Field '{field_name}' not found in {owner.getName()}")
+        return None
+    field.setAccessible(True)
+    return field
 
 
-def hook_all_methods(*args, **kwargs):
-    raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+def _find_declared_field(java_class: Any, field_name: str) -> Optional[Any]:
+    while java_class is not None:
+        try:
+            return java_class.getDeclaredField(field_name)
+        except Exception:
+            java_class = java_class.getSuperclass()
+    return None
 
 
-def unhook_all_methods(*args, **kwargs):
-    raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+def get_static_private_field(clazz: JavaClass, field_name: str) -> Optional[Any]:
+    java_class = _java_lang_class(clazz)
+    if java_class is None or not isinstance(field_name, str):
+        return None
+
+    try:
+        field = _find_declared_field(java_class, field_name)
+        if field is None:
+            return None
+
+        field.setAccessible(True)
+        return field.get(None)
+    except Exception as e:
+        log(f"Error accessing static field '{field_name}' from {java_class.getName()}: {e}\n{traceback.format_exc()}")
+        return None
 
 
-def hook_constructors(*args, **kwargs):
-    raise NotImplementedError(_HOOK_UNAVAILABLE_MESSAGE)
+def set_static_private_field(clazz: JavaClass, field_name: str, new_value: Any) -> bool:
+    java_class = _java_lang_class(clazz)
+    if java_class is None or not isinstance(field_name, str):
+        return False
+
+    try:
+        field = _find_declared_field(java_class, field_name)
+        if field is None:
+            log(f"Field '{field_name}' not found in class hierarchy of {java_class.getName()}")
+            return False
+
+        field.setAccessible(True)
+        field.set(None, new_value)
+        return True
+    except Exception as e:
+        log(f"Error setting static field '{field_name}' on {java_class.getName()}: {e}\n{traceback.format_exc()}")
+        return False
+
+
+# Irongram additions: aliases for the older helper names, kept so existing plugin code keeps
+# working after the module was replaced with exteraGram's own version.
+find_constructor = get_constructor
+find_field = get_field
+find_method = get_method
+find_static_private_field = get_static_private_field
+
+from base_plugin import (  # noqa: F401,E402  (re-exported for compatibility)
+    BaseHook,
+    HookFilter,
+    HookFilterData,
+    MethodHook,
+    MethodReplacement,
+    XposedHook,
+    hook_filters,
+    hook_runtime_available,
+)

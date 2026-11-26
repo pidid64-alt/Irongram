@@ -89,6 +89,31 @@ def check_sdk_modules():
                  "count_chars_until", "to_utf16_len"):
         check(hasattr(markdown_utils, name), "markdown_utils.{} is missing".format(name))
 
+    from base_plugin import (
+        HookFilter,
+        HookFilterData,
+        MethodHook,
+        MethodReplacement,
+        hook_filters,
+        hook_runtime_available,
+    )
+    for name, value in (
+            ("MethodHook", MethodHook),
+            ("MethodReplacement", MethodReplacement),
+            ("HookFilter", HookFilter),
+            ("HookFilterData", HookFilterData),
+            ("hook_filters", hook_filters),
+            ("hook_runtime_available", hook_runtime_available),
+    ):
+        check(value is not None, "base_plugin.{} is missing".format(name))
+    check(isinstance(HookFilter.ResultEqual(1), HookFilterData),
+          "HookFilter.ResultEqual should build HookFilterData")
+    check(HookFilter.RESULT_IS_NULL.filter_data.filter_type == "result_is_null",
+          "HookFilter.RESULT_IS_NULL should map to the exteraGram filter name")
+    check(HookFilter.Condition("param.args[0] == null").mvel_expression
+          == "param.args[0] == null",
+          "HookFilter.Condition should keep its expression")
+
     import extera_utils
     from extera_utils import metadata_parser, text_formatting
     check(hasattr(extera_utils, "__name__"), "extera_utils package is missing")

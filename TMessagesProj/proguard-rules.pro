@@ -94,3 +94,16 @@
 
 -dontwarn android.support.annotation.*
 -dontwarn androidx.compose.**
+
+# Python plugins reach these classes by name through Chaquopy, and the native hook runtime
+# registers its JNI methods against com.exteragram.hook.runtime.NativeBindings.
+-keep class tw.nekomimi.nekogram.plugins.hooks.** { *; }
+-keep class com.exteragram.hook.** { *; }
+-keep class de.robv.android.xposed.** { *; }
+-keepclassmembers class * extends de.robv.android.xposed.XC_MethodHook {
+    protected void beforeHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
+    protected void afterHookedMethod(de.robv.android.xposed.XC_MethodHook$MethodHookParam);
+}
+-dontwarn com.exteragram.hook.**
+-dontwarn de.robv.android.xposed.**
+-dontwarn org.mvel2.**

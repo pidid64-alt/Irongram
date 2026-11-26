@@ -104,10 +104,11 @@ class ExampleRewriter(BasePlugin):
   `MESSAGE_CONTEXT_MENU`, `DRAWER_MENU`, `MAIN_MENU`, and `PROFILE_ACTION_MENU` entries are
   registered but not rendered yet.
 - exteraGram helper modules bundled with the app:
-  - `hook_utils`: `find_class`, `find_method`, `get_private_field`, `set_private_field` (reflection
-    helpers) plus the `MethodHook` / `MethodReplacement` / `HookFilter` names re-exported from
-    `base_plugin`. `hook_method`, `unhook_method`, and `hook_all_methods` raise
-    `NotImplementedError`.
+  - `hook_utils`: exteraGram's own module — `find_class`, `get_method`, `get_constructor`,
+    `get_field`, `get_private_field`, `set_private_field`, `get_static_private_field`,
+    `set_static_private_field`, `java_class` (with `find_method`/`find_constructor`/`find_field`
+    aliases), plus the `MethodHook` / `MethodReplacement` / `HookFilter` names re-exported from
+    `base_plugin`.
   - `ui.alert.AlertDialogBuilder`: `set_title`, `set_message`, `set_view`, `set_items`,
     `set_positive_button`, `set_negative_button`, `set_neutral_button`, `make_button_red`,
     `create`, `show`; button callbacks receive `(dialog, which)`.
@@ -134,18 +135,50 @@ class ExampleRewriter(BasePlugin):
   are not executed. `EditText` supports multiline input and `max_length`; custom input masks and
   custom settings long-click callbacks are not implemented.
 
+## Java method hooking
+
+Plugins can patch Java methods exactly as on exteraGram:
+
+```python
+from base_plugin import BasePlugin, MethodHook, MethodReplacement, HookFilter
+from hook_utils import find_class, get_method
+
+class Plugin(BasePlugin):
+    def on_plugin_load(self):
+        controller = find_class("org.telegram.messenger.MessagesController")
+        method = get_method(controller, "isOnline")
+        self.hook_method(method, self.only_before)          # before/after callbacks
+        self.hook_all_methods(find_class("org.telegram.ui.ChatActivity"),
+                              "onBackPressedPressed", self.block_all)  # every overload
+        self.hook_method(method, MethodReplacement(...))     # full replacement
+```
+
+`hook_method`, `hook_all_methods`, `hook_all_constructors` and `unhook_method` accept
+`MethodHook`/`MethodReplacement` objects or `before=`/`after=` callables, plus `priority=` and
+`before_filters=`/`after_filters=` (also as a `@hook_filters(...)` decorator, including
+`HookFilter.Condition("...")` MVEL expressions). Callbacks receive the real
+`XC_MethodHook.MethodHookParam`, so `param.thisObject`, `param.args[i] = value`,
+`param.getResult()`/`param.setResult()` and `param.setThrowable()` behave as in Xposed. Hooks are
+removed automatically when the plugin is disabled or unloaded, and they are skipped while the
+plugin is inactive.
+
+Under the hood this uses exteraHook — the same ART hook runtime exteraGram ships: `hook-core`
+(the `de.robv.android.xposed` compatibility layer) plus its LSPlant fork, both vendored in
+`Tools/maven` and linked into `libtmessages.49.so`. Two consequences:
+
+- Hooking is available on **arm64-v8a and armeabi-v7a** only; the vendored runtime ships no x86
+  native libraries, so on x86/x86_64 the client still runs but `hook_method` reports that hooking
+  is unavailable.
+- A hook that crashes inside a plugin is caught and logged, but a plugin that hooks core client
+  code can still destabilise the process. Enable hooking plugins one at a time.
+
 ## Not yet compatible
 
 This is **not full AyuGram/exteraGram compatibility yet**. In particular:
 
-- Arbitrary Xposed-style Java method hooking (`hook_method`, `hook_all_methods`,
-  `hook_all_constructors`, `unhook_method`, `hook_call_site`, `hook_field_read`,
-  `hook_field_write`, `hook_string_constant`, `hook_return_value`, `MethodHook`,
-  `MethodReplacement`) is not implemented. All of them raise `NotImplementedError` with an explicit
-  message, so a plugin that depends on patching Java methods fails to load with a readable error
-  instead of silently doing nothing. exteraGram plugins such as
-  `AlexeiCrystal/extera-plugins` (`extera-no-feed-ads`, `extera-easter-eggs-protector`) belong to
-  this group.
+- Partial hooks (`hook_call_site`, `hook_field_read`, `hook_field_write`,
+  `hook_string_constant`, `hook_return_value`, `unhook_partial`) are not implemented and raise
+  `NotImplementedError`; plain `hook_method` / `hook_all_methods` / `hook_all_constructors` are.
 - Only the chat three-dot menu renders plugin entries; message context menus, the drawer, and the
   profile menu do not show plugin entries yet.
 - A narrow subset of `android_utils` is implemented in
